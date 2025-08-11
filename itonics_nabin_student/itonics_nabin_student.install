@@ -1,0 +1,83 @@
+<?php
+
+/**
+ * @file
+ * Install, update and uninstall features for Itonics Nabin Student Module
+ */
+
+function itonics_nabin_install() {
+    itonics_nabin_student_schema();
+}
+
+function itonics_nabin_student_schema() {
+    $schema['itonics_nabin_student_information'] = [
+        'description' => 'Holds definitions important for student information.',
+        'fields' => [
+            'student_id' => [
+                'type' => 'serial',
+                'unsigned' => TRUE,
+                'not null' => TRUE,
+                'description' => 'Primary Key: Unique id for student information.',
+            ],
+            'first_name' => [
+                'type' => 'varchar',
+                'length' => 255,
+                'not null' => TRUE,
+                'description' => 'First name of the student.',
+            ],
+            'last_name' => [
+                'type' => 'varchar',
+                'length' => 255,
+                'not null' => TRUE,
+                'description' => 'Last name for the student.',
+            ],
+            'profile_picture' => [
+                'type' => 'int',
+                'not null' => TRUE,
+                'description' => 'File path for the student\'s profile picture.',
+            ],
+            'gender' => [
+                'type' => 'varchar',
+                'length' => 255,
+                'not null' => TRUE,
+                'description' => 'The gender of the student. Example (M, F, Other)',
+            ],
+            'grade' => [
+                'type' => 'varchar',
+                'length' => 255,
+                'not null' => TRUE,
+                'description' => 'Grade of the student. Example (A, A+, B, C).',
+            ],
+            'admission_date' => [
+                'type' => 'datetime',
+                'mysql_type' => 'DATETIME',
+                'not null' => TRUE,
+                'description' => 'Date of addmission of the student.',
+            ],
+            'description' => [
+                'type' => 'text',
+                'size' => 'big',
+                'not null' => FALSE,
+                'description' => 'Rich text description of the student.'
+            ],
+            'created' => [
+                'type' => 'int',
+                'not null' => TRUE,
+                'default' => 0,
+                'description' => 'The UNIX timestamp when the student was created.'
+            ],
+            'changed' => [
+                'type' => 'int',
+                'not null' => TRUE,
+                'default' => 0,
+                'description' => 'The UNIX timestamp when the students data was updated.'
+            ],
+        ],
+        'primary key' => ['student_id'],
+        'indexes' => [
+            'first_name' => ['first_name']
+        ],
+    ];
+
+    return $schema;
+}

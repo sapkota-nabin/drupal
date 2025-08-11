@@ -1,0 +1,9 @@
+name = Nabin Itonics Student Module
+description = Custom module for student management
+package = Custom
+version = 1.0
+core = 7.x
+dependencies[] = image
+dependencies[] = ctools
+dependencies[] = date
+dependencies[] = date_popup

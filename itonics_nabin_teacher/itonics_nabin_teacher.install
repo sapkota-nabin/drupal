@@ -1,0 +1,150 @@
+<?php
+
+/**
+ * @file
+ * Install, update and uninstall features for Itonics Nabin Teacher Module
+ */
+
+function itonics_nabin_teacher_install() {
+    itonics_nabin_teacher_schema();
+}
+
+function itonics_nabin_teacher_schema() {
+    $schema = [
+        'itonics_nabin_teacher_information' => [
+            'description' => 'Holds definitions important for teacher information.',
+            'fields' => [
+                'teacher_id' => [
+                    'type' => 'serial',
+                    'unsigned' => TRUE,
+                    'not null' => TRUE,
+                    'description' => 'Primary Key: Unique id for teacher information.',
+                ],
+                'first_name' => [
+                    'type' => 'varchar',
+                    'length' => 255,
+                    'not null' => TRUE,
+                    'description' => 'First name of the teacher.',
+                ],
+                'last_name' => [
+                    'type' => 'varchar',
+                    'length' => 255,
+                    'not null' => TRUE,
+                    'description' => 'Last name for the teacher.',
+                ],
+                'profile_picture' => [
+                    'type' => 'int',
+                    'not null' => TRUE,
+                    'description' => 'File path for the teacher\'s profile picture.',
+                ],
+                'gender' => [
+                    'type' => 'varchar',
+                    'length' => 255,
+                    'not null' => TRUE,
+                    'description' => 'The gender of the teacher. Example (M, F, Other)',
+                ],
+                'job_type' => [
+                    'type' => 'varchar',
+                    'length' => 255,
+                    'not null' => TRUE,
+                    'description' => 'Job type of the teacher. Example (full time, part time).',
+                ],
+                'join_date' => [
+                    'type' => 'datetime',
+                    'mysql_type' => 'DATETIME',
+                    'not null' => TRUE,
+                    'description' => 'Date of joining of the teacher.',
+                ],
+                'description' => [
+                    'type' => 'text',
+                    'size' => 'big',
+                    'not null' => FALSE,
+                    'description' => 'Rich text description of the student.'
+                ],
+                'created' => [
+                    'type' => 'int',
+                    'not null' => TRUE,
+                    'default' => 0,
+                    'description' => 'The UNIX timestamp when the student was created.'
+                ],
+                'changed' => [
+                    'type' => 'int',
+                    'not null' => TRUE,
+                    'default' => 0,
+                    'description' => 'The UNIX timestamp when the students data was updated.'
+                ],
+            ],
+            'primary key' => ['teacher_id'],
+            'indexes' => [
+                'first_name' => ['first_name']
+            ],
+        ],
+        'itonics_nabin_states' => [
+            'description' => 'Holds the information for states',
+            'fields' => [
+                'state_id' => [
+                    'type' => 'serial',
+                    'unsigned' => TRUE,
+                    'not null' => TRUE,
+                    'description' => 'Primary Key: Unique id for state.',
+                ],
+                'state_name' => [
+                    'type' => 'varchar',
+                    'length' => 255,
+                    'not null' => true,
+                    'description' => 'State name',
+                ],
+            ],
+            'primary key' => ['state_id'],
+        ],
+        'itonics_nabin_district' => [
+            'description' => 'Holds the information for districts',
+            'fields' => [
+                'district_id' => [
+                    'type' => 'serial',
+                    'unsigned' => TRUE,
+                    'not null' => TRUE,
+                    'description' => 'Primary Key: Unique id for districts',
+                ],
+                'state_id' => [
+                    'type' => 'int',
+                    'not null' => TRUE,
+                    'description' => 'Foreign Key: references states.',
+                ],
+                'district_name' => [
+                    'type' => 'varchar',
+                    'length' => 255,
+                    'not null' => true,
+                    'description' => 'State name',
+                ],
+            ],
+            'primary key' => ['district_id'],
+            'foreign keys' => [
+                'region_state_id_foreign_key' => [
+                    'table' => 'itonics_nabin_states',
+                    'columns' => [
+                        'state_id' => 'state_id',
+                    ],
+                ],
+            ],
+        ],
+    ];
+
+    return $schema;
+}
+
+function itonics_nabin_teacher_update_7001() {
+    if (!db_field_exists('itonics_nabin_teacher_information', 'district_id')) {
+        db_add_field('itonics_nabin_teacher_information', 'district_id', [
+            'type' => 'int',
+            'not null' => FALSE,
+            'description' => 'References district.',
+        ]);
+    }
+}
+
+function itonics_nabin_teacher_uninstall() {
+    drupal_uninstall_schema('itonics_nabin_teacher_information');
+    drupal_uninstall_schema('itonics_nabin_states');
+    drupal_uninstall_schema('itonics_nabin_district');
+}

@@ -1,0 +1,729 @@
+<?php
+
+// for future MVC tryout
+// module_load_include('php', 'itonics_nabin_teacher', 'src/TeacherServiceContainer');
+// ajax_command_invoke() for validation and submit
+function itonics_nabin_teacher_init() {
+    itonis_nabin_teacher_insert_sample_data();
+}
+
+
+/**
+ * Inserts sample data in `itonics_nabin_states` and `itonics_nabin_district` tables
+ * if the mentioned tables are empty
+ *
+ * @return void
+ * @throws Exception
+ */
+function itonis_nabin_teacher_insert_sample_data() {
+    $states_query = db_select('itonics_nabin_states', 's');
+    $states_query->addExpression('COUNT(state_id)', 'total_states');
+    $states = $states_query->execute()->fetchField();
+//    var_dump($states);
+//    die();
+    if ($states == 0) {
+        $query =  db_insert('itonics_nabin_states')
+            ->fields(['state_name']);
+        $values = [];
+        foreach (['Koshi', 'Madhesh', 'Bagmati', 'Gandaki', 'Lumbini', 'Karnali', 'Sudurpashchim'] as $state) {
+            $query->values(['state_name' => $state]);
+        }
+
+        $query->execute();
+    }
+
+    $states = db_select('itonics_nabin_states', 's')
+        ->fields('s')
+        ->execute()
+        ->fetchAllAssoc('state_id');
+
+    $regions_count_query = db_select('itonics_nabin_district', 'r');
+    $regions_count_query->addExpression('COUNT(district_id)', 'total_regions');
+    $regions_count = $regions_count_query->execute()->fetchField();
+
+    if ($regions_count == 0) {
+        $sample_regions = [
+            'Koshi' => [
+                'Morang',
+                'Sunsari',
+                'Jhapa',
+            ],
+            'Madhesh' => [
+                'Dhanusha',
+                'Sarlahi',
+                'Bara',
+            ],
+            'Bagmati' => [
+                'Kathmandu',
+                'Chitwan',
+                'Makwanpur',
+            ],
+            'Gandaki' => [
+                'Baglung',
+                'Gorkha',
+                'Kaski',
+            ],
+            'Lumbini' => [
+                'Kapilvastu',
+                'Parasi',
+                'Rupandehi',
+            ],
+            'Karnali' => [
+                'Humla',
+                'Jumla',
+                'Kalikot',
+            ],
+            'Sudurpashchim' => [
+                'Achham',
+                'Darchula',
+                'Bajhang',
+            ],
+        ];
+        $districts_insert_data = [];
+        foreach ($states as $state) {
+            $state_wise_districts = $sample_regions[$state->state_name] ?? [];
+            if (count($state_wise_districts)) {
+                foreach ($state_wise_districts as $district) {
+                    $districts_insert_data[] = [
+                        'state_id' => $state->state_id,
+                        'district_name' => $district,
+                    ];
+                }
+            }
+        }
+
+        if (count($districts_insert_data)) {
+            $district_insert_query = db_insert('itonics_nabin_district')
+                ->fields(['district_name', 'state_id']);
+
+            foreach ($districts_insert_data as $district_data) {
+                $district_insert_query->values($district_data);
+            }
+
+            $district_insert_query->execute();
+        }
+    }
+}
+
+
+/**
+ * @return array[]
+ */
+function itonics_nabin_teacher_menu() {
+    return [
+        'admin/itonics-nabin-teachers' => [
+            'title' => 'ITONICS TEACHERS',
+            'description' => 'List all teachers',
+            'page callback' => 'itonics_nabin_teacher_list',
+            'access arguments' => ['view teachers'],
+            'type' => MENU_NORMAL_ITEM,
+        ],
+        'admin/itonics-nabin-teacher/add' => [
+            'title' => 'Add Teacher',
+            'description' => 'Add teacher',
+            'page callback' => 'drupal_get_form',
+            'page arguments' => ['itonics_nabin_teacher_form'],
+            'access arguments' => ['add new teacher'],
+            'type' => MENU_NORMAL_ITEM,
+        ],
+        'admin/itonics-nabin-teacher/edit/%' => [
+            'title' => 'Edit Teacher',
+            'description' => 'Edit teacher',
+            'page callback' => 'drupal_get_form',
+            'page arguments' => ['itonics_nabin_teacher_form', 3],
+            'access arguments' => ['edit teacher'],
+            'type' => MENU_CALLBACK,
+        ],
+        'admin/itonics-nabin-teacher/delete/%' => [
+            'title' => 'Delete Teacher',
+            'description' => 'Delete Teacher',
+            'page callback' => 'drupal_get_form',
+            'page arguments' => ['itonics_nabin_teacher_delete_form', 3],
+            'access arguments' => ['delete teacher'],
+            'type' => MENU_CALLBACK,
+        ],
+        'admin/itonics-nabin-teacher/view/%' => [
+            'title' => 'View Teacher',
+            'description' => 'View Teacher',
+            'page callback' => 'itonics_nabin_teacher_view',
+            'page arguments' => [3],
+            'access arguments' => ['view teachers'],
+            'type' => MENU_CALLBACK,
+        ],
+    ];
+}
+
+
+function itonics_nabin_teacher_permission() {
+    return [
+        'view teachers' => [
+            'title' => 'View teachers',
+            'description' => 'View list of teachers.',
+        ],
+        'add new teacher' => [
+            'title' => 'Add teacher',
+            'description' => 'Add teacher',
+        ],
+        'edit teacher' => [
+            'title' => 'Edit teacher',
+            'description' => 'Update the teacher data',
+        ],
+        'delete teacher' => [
+            'title' => 'Delete teacher',
+            'description' => 'Delete the selected teacher.',
+        ],
+    ];
+}
+
+function itonics_nabin_teacher_list() {
+    if (!user_access('view teachers')) {
+        return MENU_ACCESS_DENIED;
+    }
+
+    $headers = [
+        'profile_picture' => [
+            'data' => 'Profile Picture',
+            'field' => 'profile_picture',
+        ],
+        'first_name' => [
+            'data' => 'First Name',
+            'field' => 'first_name',
+            'sort' => true,
+        ],
+        'last_name' => [
+            'data' => 'Last Name',
+            'field' => 'last_name',
+        ],
+        'gender' => [
+            'data' => 'Gender',
+            'field' => 'gender',
+        ],
+        'job_type' => [
+            'data' => 'Job Type',
+            'field' => 'job_type',
+        ],
+        'join_date' => [
+            'data' => 'Join Date',
+            'field' => 'join_date',
+        ],
+        'actions' => [
+            'data' => 'Actions',
+        ]
+    ];
+
+    $rows = [];
+
+    $results = db_select('itonics_nabin_teacher_information', 't')
+        ->extend('PagerDefault')
+        ->extend('TableSort')
+        ->fields('t')
+        ->limit(50)
+        ->orderByHeader($headers)
+        ->execute();
+
+    foreach ($results as $row) {
+        $image = '';
+        if (!empty($row->profile_picture)) {
+            $file = file_load($row->profile_picture);
+            if ($file) {
+                $image = theme('image_style', [
+                    'style_name' => 'thumbnail',
+                    'path' => $file->uri,
+                    'alt' => $row->first_name,
+                    'title' => $row->first_name,
+                ]);
+            }
+        }
+
+        $rows[] = [
+            'profile_picture' => $image,
+            'first_name' => check_plain($row->first_name),
+            'last_name' => check_plain($row->last_name),
+            'gender' => $row->gender,
+            'job_type' => $row->job_type,
+            'join_date' => format_date(strtotime($row->join_date), 'custom', 'Y-m-d'),
+            'actions' => [
+                'data' => [
+                    '#theme' => 'links',
+                    '#links' => [
+                        'view' => [
+                            'title' => 'View',
+                            'href' => 'admin/itonics-nabin-teacher/view/' . $row->teacher_id,
+                        ],
+                        'edit' => [
+                            'title' => 'Edit',
+                            'href' => 'admin/itonics-nabin-teacher/edit/' .  $row->teacher_id,
+                        ],
+                        'delete' => [
+                            'title' => 'Delete',
+                            'href' => 'admin/itonics-nabin-teacher/delete/' . $row->teacher_id,
+                        ],
+                    ],
+                    '#attributes' => [
+                        'class' => ['links', 'inline'],
+                    ],
+                ],
+            ],
+        ];
+    }
+
+    $build['teachers_table'] = [
+        '#theme' => 'table',
+        '#header' => $headers,
+        '#rows' => $rows,
+        '#empty' => 'No teachers',
+    ];
+    $build['pager'] = [
+        '#theme' => 'pager',
+    ];
+
+    $build['add_link'] = [
+        '#markup' => l('Add Teacher', 'admin/itonics-nabin-teacher/add'),
+    ];
+
+    return $build;
+}
+
+function _itonics_nabin_ajax_get_states($district = null) {
+    // @TODO: Fetch from 'itonics_nabin_states' table and return the results
+    $records = db_select('itonics_nabin_states', 't')
+        ->fields('t', ['state_id', 'state_name'])
+        ->execute()
+        ->fetchAll();
+
+    $states = [];
+    $selected_state_id = null;
+    if ($district) {
+        $selected_district = db_select('itonics_nabin_district', 'd')
+            ->fields('d')
+            ->condition('d.district_id', $district)
+            ->execute()
+            ->fetchObject();
+
+        if ($selected_district) {
+            $selected_state_id  = $selected_district->state_id;
+        }
+    }
+
+    foreach ($records as $record) {
+        $states[$record->state_id] = $record->state_name;
+    }
+
+    return [
+        'selected' => $selected_state_id,
+        'states' => $states
+    ];
+}
+
+function _itonics_nabin_ajax_get_districts($state = '') {
+    if (empty($state)) {
+        return [];
+    }
+
+    $results = db_select('itonics_nabin_district', 'r')
+        ->fields('r', ['district_id', 'district_name'])
+        ->condition('state_id', $state)
+        ->execute()
+        ->fetchAll();
+    $regions = [];
+    foreach ($results as $result) {
+        $regions[$result->district_id] = $result->district_name;
+    }
+    return $regions;
+}
+
+function itonics_nabin_teacher_view($teacher_id) {
+    $teacher = db_select('itonics_nabin_teacher_information', 't')
+        ->fields('t')
+        ->condition('teacher_id', $teacher_id)
+        ->execute()
+        ->fetchObject();
+
+    if (!$teacher) {
+        return drupal_not_found();
+    }
+    $profile_picture = null;
+    if (!empty($teacher->profile_picture)) {
+        $file = file_load($teacher->profile_picture);
+
+        if ($file) {
+            $profile_picture = theme('image_style', [
+                'style_name' => 'thumbnail',
+                'path' => $file->uri,
+                'alt' => $teacher->first_name,
+                'title' => $teacher->first_name,
+            ]);
+        }
+    }
+    $full_name = $teacher->first_name . ' ' . $teacher->last_name;
+    $genders = [
+        'M' => 'Male',
+        'F' => 'Female',
+        'O' => 'Others'
+    ];
+    $job_types = [
+        'full-time' => 'Full-Time',
+        'part-time' => 'Part-Time',
+    ];
+    // @TODO: load district as well
+    $teacher_view = [
+        'name' => [
+            '#markup' => '<h1>' . check_plain($full_name) . '</h1>',
+        ],
+        'details' => [
+            '#theme' => 'table',
+            '#rows' => [
+                [
+                    [
+                        'data' => 'First Name',
+                        'header' => TRUE,
+                    ],
+                    check_plain($teacher->first_name),
+                ],
+                [
+                    [
+                        'data' => 'Last Name',
+                        'header' => TRUE,
+                    ],
+                    check_plain($teacher->last_name),
+                ],
+                [
+                    [
+                        'data' => 'Gender',
+                        'header' => TRUE,
+                    ],
+                    check_plain($teacher->gender),
+                ],
+                [
+                    [
+                        'data' => 'Job Type',
+                        'header' => TRUE,
+                    ],
+                    @unserialize($teacher->job_type),
+                ],
+                [
+                    [
+                        'data' => 'Join Date',
+                        'header' => TRUE,
+                    ],
+                    format_date(strtotime($teacher->join_date), 'long'),
+                ],
+            ],
+        ],
+    ];
+
+    if (!empty($profile_picture)) {
+        $teacher_view['profile_picture'] = [
+            '#markup' => $profile_picture,
+        ];
+    }
+    $teacher_view['description'] = [
+        '#markup' => '<h2>' . t('Description') . '</h2><div class="teacher-description">' . check_markup($teacher->description, 'full_html') . '</div>',
+    ];
+
+    $teacher_view['actions'] = [
+        '#markup' => '<div class="actions">' .
+            l(t('Edit'), 'admin/itonics-nabin-teacher/edit/' . $teacher_id) . ' | ' .
+            l(t('Delete'), 'admin/itonics-nabin-teacher/delete/' . $teacher_id) . ' | ' .
+            l(t('Back to list'), 'admin/itonics-nabin-teachers') .
+            '</div>',
+    ];
+
+    return $teacher_view;
+}
+
+function itonics_nabin_teacher_form($form, &$form_state, $teacher_id = null) {
+    $form = [];
+
+    $teacher = null;
+
+    if ($teacher_id) {
+        $teacher = db_select('itonics_nabin_teacher_information', 't')
+            ->fields('t')
+            ->condition('teacher_id', $teacher_id)
+            ->execute()
+            ->fetchObject();
+
+        if (!empty($teacher->profile_picture)) {
+            $form_state['storage']['old_image'] = $teacher->profile_picture;
+        }
+    }
+
+    $genders = [
+        'M' => 'Male',
+        'F' => 'Female',
+        'O' => 'Others'
+    ];
+    $job_types = [
+        'full-time' => 'Full-Time',
+        'part-time' => 'Part-Time',
+    ];
+
+    $get_state_options = _itonics_nabin_ajax_get_states(isset($teacher) ? $teacher->region_id ?? NULL : null);
+    $state_options = $get_state_options['states'] ?? [];
+    $selected_state = isset($form_state['values']['state']) ? $form_state['values']['state'] : key($state_options);
+
+
+    $form = [
+        'first_name' => [
+            '#type' => 'textfield',
+            '#title' => 'First Name',
+            '#prefix' => '<div id="first-name-wrapper">',
+            '#suffix' => '</div>',
+            '#default_value' => !empty($teacher) ? $teacher->first_name : '',
+        ],
+        'last_name' => [
+            '#type' => 'textfield',
+            '#title' => 'Last Name',
+            '#prefix' => '<div id="last-name-wrapper">',
+            '#suffix' => '</div>',
+            '#default_value' => !empty($teacher) ? $teacher->last_name : '',
+        ],
+        'gender' => [
+            '#type' => 'radios',
+            '#title' => 'Gender',
+            '#options' => $genders,
+            '#prefix' => '<div id="gender-wrapper">',
+            '#suffix' => '</div>',
+            '#default_value' => !empty($teacher) ? $teacher->gender : '',
+        ],
+        'job_type' => [
+            '#type' => 'checkboxes',
+            '#title' => 'Job Type',
+            '#options' => $job_types,
+            '#prefix' => '<div id="job-type-wrapper">',
+            '#suffix' => '</div>',
+            '#default_value' => !empty($teacher) ? @unserialize($teacher->job_type) : [],
+        ],
+        'profile_picture' => [
+            '#type' => 'managed_file',
+            '#title' => 'Profile Picture',
+            '#required' => TRUE,
+            '#default_value' => !empty($teacher) ? $teacher->profile_picture : NULL,
+            '#upload_location' => 'public://profile_pictures/',
+            '#upload_validators' => [
+                'file_validate_extensions' => ['png jpg jpeg'],
+            ],
+            '#prefix' => '<div id="profile-picture-wrapper">',
+            '#suffix' => '</div>',
+        ],
+        'state' => [
+            '#type' => 'select',
+            '#title' => 'State',
+            '#default_value' => $selected_state,
+            '#options' => $state_options,
+            '#ajax' => [
+                'callback' => 'itonics_nabin_ajax_get_districts_callback',
+                'wrapper' => 'districts-dropdown-wrapper',
+            ],
+        ],
+        'region_id' => [
+            '#type' => 'select',
+            '#title' => $state_options[$selected_state] . ' Regions',
+            '#prefix' => '<div id="districts-dropdown-wrapper">',
+            '#suffix' => '</div>',
+            '#options' => _itonics_nabin_ajax_get_districts($selected_state),
+            '#default_value' => !empty($teacher) ? $teacher->region_id ?? '' : '',
+        ],
+        'join_date' => [
+            '#type' => 'date_popup',
+            '#title' => 'Join Date',
+            '#date_format' => 'Y-m-d',
+            '#default_value' => !empty($teacher) ? format_date(strtotime($teacher->join_date), 'custom', 'Y-m-d') : NULL,
+            '#prefix' => '<div id="join-date-wrapper">',
+            '#suffix' => '</div>',
+        ],
+        'description' => [
+            '#type' => 'text_format',
+            '#title' => 'Description',
+            '#format' => 'filtered_html',
+            '#default_value' => !empty($teacher) ? $teacher->description : NULL,
+            '#required' => FALSE,
+        ],
+        'submit' => [
+            '#type' => 'submit',
+            '#value' => 'Submit',
+            '#ajax' => [
+                'callback' => 'itonics_nabin_teacher_ajax_form_submit_callback',
+                'wrapper' => 'itonics-nabin-teacher-form-wrapper',
+            ]
+        ],
+        'teacher_id' => [
+            '#type' => 'value',
+            '#value' => !empty($teacher) ? $teacher->teacher_id : NULL,
+        ],
+    ];
+
+    return $form;
+}
+
+function itonics_nabin_ajax_get_districts_callback($form, $form_state) {
+    return $form['region_id'];
+}
+
+function itonics_nabin_teacher_ajax_form_submit_callback($form, &$form_state) {
+    $commands = [];
+    $values = $form_state['values'];
+//    var_dump($values);
+//    die();
+    $has_error = FALSE;
+    $fields = [
+        'first_name' => [
+            'wrapper' => '#first-name-wrapper',
+            'selector' => '#edit-first_name',
+            'message' => '<div class="custom-error" >First name is required.</div>',
+        ],
+        'last_name' => [
+            'wrapper' => '#last-name-wrapper',
+            'selector' => '#edit-last_name',
+            'message' => '<div class="custom-error" >Last name is required.</div>',
+        ],
+        'gender' => [
+            'wrapper' => '#gender-wrapper',
+            'selector' => 'input[name="gender"]',
+            'message' => '<div class="custom-error" >Gender is required.</div>',
+        ],
+        'job_type' => [
+            'wrapper' => '#job-type-wrapper',
+            'selector' => 'input[name="job_type"]',
+            'message' => '<div class="custom-error" >Job Type is required.</div>',
+        ],
+        'join_date' => [
+            'wrapper' => '#join-date-wrapper',
+            'selector' => '#edit-join_date',
+            'message' => '<div class="custom-error" >Join Date is required.</div>',
+        ],
+//        'profile_picture' => [
+//            'wrapper' => '#profile-picture-wrapper',
+//            'selector' => '#edit-profile-picture',
+//            'message' => '<div class="custom-error" >Profile Picture is required.</div>',
+//        ],
+    ];
+
+    foreach ($fields as $key => $field) {
+        itonics_nabin_teacher_form_error_ajax_commands($commands, $field['wrapper'], NULL, $field['selector'], FALSE);
+        if (empty($values[$key])) {
+            $has_error = TRUE;
+            itonics_nabin_teacher_form_error_ajax_commands($commands, $field['wrapper'], $field['message'], $field['selector']);
+        }
+    }
+
+    if ($has_error) {
+        return [
+            '#type' => 'ajax',
+            '#commands' => $commands,
+        ];
+    } else {
+        return store_or_update_teacher($form, $form_state);
+    }
+
+    // proceed with create update
+}
+
+function store_or_update_teacher($form, &$form_state) {
+    $values = $form_state['values'];
+
+    $file = file_load($values['profile_picture']);
+
+    $file->status = FILE_STATUS_PERMANENT;
+    file_save($file);
+    file_usage_add($file, 'itonics_nabin_teacher', 'teacher_information', isset($values['teacher_id']) ? $values['teacher_id'] : 0);
+    $profile_picture_id = $file->fid;
+
+    $fields = [
+        'first_name' => $values['first_name'],
+        'last_name' => $values['last_name'],
+        'gender' => $values['gender'],
+        'region_id' => $values['region_id'],
+        'profile_picture' => $profile_picture_id,
+        'description' => $values['description']['value'],
+        'job_type' => isset($values['job_type']) ? serialize($values['job_type']) : NULL,
+        'join_date' => date($values['join_date']),
+        'updated' => REQUEST_TIME,
+    ];
+
+    if (empty($values['teacher_id'])) {
+        $fields['created'] = REQUEST_TIME;
+        drupal_write_record('itonics_nabin_teacher_information', $fields);
+        drupal_set_message('Teacher created successfully.');
+    } else {
+        $fields['teacher_id'] = $values['teacher_id'];
+        drupal_write_record('itonics_nabin_teacher_information', $fields, 'teacher_id');
+        if (!empty($form_state['storage']['old_image'])) {
+            $old_file = file_load($form_state['storage']['old_image']);
+            file_usage_delete($old_file, 'itonics_nabin_teacher', 'teacher_information', $values['teacher_id']);
+            file_delete($old_file);
+        }
+        drupal_set_message('Teacher updated successfully.');
+    }
+
+    $form_state['redirect'] = 'admin/itonics-nabin-teachers';
+    return $form;
+}
+
+function itonics_nabin_teacher_delete_form($form, &$form_state, $teacher_id) {
+    $form['teacher_id'] = [
+        '#type' => 'value',
+        '#value' => $teacher_id,
+    ];
+
+    return confirm_form(
+        $form,
+        t('Are you sure you want to delete this teacher?'),
+        'admin/itonics-nabin-teacher',
+        t('This action cannot be undone.'),
+        t('Delete'),
+        t('Cancel')
+    );
+}
+
+function itonics_nabin_teacher_delete_form_submit($form, &$form_state) {
+    $teacher_id = $form_state['values']['teacher_id'];
+
+    $teacher = db_select('itonics_nabin_teacher_information', 't')
+        ->fields('t')
+        ->condition('teacher_id', $teacher_id)
+        ->execute()
+        ->fetchObject();
+
+    if (!empty($teacher->profile_picture)) {
+        $file = file_load($teacher->profile_picture);
+        if ($file) {
+            file_usage_delete($file, 'itonics_nabin_teacher', 'teacher_information', $teacher_id);
+            file_delete($file);
+        }
+    }
+
+    db_delete('itonics_nabin_teacher_information')
+        ->condition('teacher_id', $teacher_id)
+        ->execute();
+
+    drupal_set_message('Teacher deleted');
+    $form_state['redirect'] = 'admin/itonics-nabin-teachers';
+}
+
+
+/**
+ * @param array $commands
+ * @param $wrapper_id
+ * @param $error_message
+ * @param $field_selector
+ * @param $add_class
+ * @return void
+ */
+function itonics_nabin_teacher_form_error_ajax_commands(array &$commands, $wrapper_id, $error_message = NULL, $field_selector = '', $add_class = TRUE) {
+    if ($error_message !== NULL) {
+        $commands[] = ajax_command_invoke($wrapper_id . ' .custom-error', 'remove');
+        $commands[] = ajax_command_invoke($wrapper_id, 'prepend', [$error_message]);
+    } else {
+        $commands[] = ajax_command_invoke($wrapper_id . ' .custom-error', 'remove');
+    }
+
+    if ($field_selector) {
+        if ($add_class) {
+            $commands[] = ajax_command_invoke($field_selector, 'addClass', ['error']);
+        } else {
+            $commands[] = ajax_command_invoke($field_selector, 'removeClass', ['error']);
+        }
+    }
+}

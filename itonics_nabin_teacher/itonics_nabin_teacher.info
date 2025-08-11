@@ -1,0 +1,12 @@
+name = Nabin Itonics Teacher Module
+description = Custom module for teacher management
+package = Custom
+version = 1.0
+core = 7.x
+
+stylesheets[all][] = teacher.css
+dependencies[] = image
+dependencies[] = ctools
+dependencies[] = date
+dependencies[] = date_popup
+
