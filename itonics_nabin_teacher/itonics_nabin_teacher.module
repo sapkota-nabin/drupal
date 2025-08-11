@@ -564,8 +564,7 @@ function itonics_nabin_ajax_get_districts_callback($form, $form_state) {
 function itonics_nabin_teacher_ajax_form_submit_callback($form, &$form_state) {
     $commands = [];
     $values = $form_state['values'];
-//    var_dump($values);
-//    die();
+
     $has_error = FALSE;
     $fields = [
         'first_name' => [
