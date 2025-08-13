@@ -1,0 +1,14 @@
+name = Nabin Itonics Faculty Module
+description = Custom module for faculty management
+package = Custom
+version = 1.0
+core = 7.x
+
+dependencies[] = ctools
+dependencies[] = itonics_nabin_student
+dependencies[] = itonics_nabin_teacher
+dependencies[] = advanced_help:advanced_help
+dependencies[] = ctools:ctools
+dependencies[] = ctools:page_manager
+dependencies[] = panels:panels
+

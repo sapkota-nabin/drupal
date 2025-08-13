@@ -91,10 +91,7 @@ function itonics_nabin_student_permission() {
 
 function itonics_nabin_students_list() {
     global $genders, $grades;
-    if (!user_access('add new student')) {
-        return MENU_ACCESS_DENIED;
-    }
-    $grant = user_access('view students');
+
     $headers = [
         'profile_picture' => [
             'data' => 'Profile Picture',
