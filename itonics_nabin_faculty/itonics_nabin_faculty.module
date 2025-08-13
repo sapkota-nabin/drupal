@@ -168,9 +168,6 @@ function itonics_nabin_faculty_form($faculty_id = NULL) {
         'show back' => TRUE,
         'show cancel' => TRUE,
         'show return' => FALSE,
-//        'next callback' => 'itonics_nabin_faculty_next',
-//        'finish callback' => 'itonics_nabin_faculty_finish',
-//        'cancel callback' => 'itonics_nabin_faculty_cancel',
         'order' => array(
             'start' => t('Choose faculty'),
         ),
@@ -191,21 +188,6 @@ function itonics_nabin_faculty_form($faculty_id = NULL) {
     print ajax_render($commands);
     exit;
 }
-
-//function itonics_nabin_faculty_next(&$form_state) {
-//    ctools_ajax_sample_cache_set($form_state['object_id'], $form_state['object']);
-//}
-
-//function itonics_nabin_faculty_finish(&$form_state) {
-//    $form_state['complete'] = TRUE;
-//}
-
-/**
- * Handle the 'cancel' click on the add/edit pane form wizard.
- */
-//function itonics_nabin_faculty_cancel(&$form_state) {
-//    $form_state['cancel'] = TRUE;
-//}
 
 function itonics_nabin_faculty_start($form, &$form_state) {
     $faculty = null;
