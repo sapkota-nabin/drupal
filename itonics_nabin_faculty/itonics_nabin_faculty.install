@@ -1,0 +1,62 @@
+<?php
+
+/**
+ * @file
+ * Install, update and uninstall features for Itonics Nabin Student Module
+ */
+
+function itonics_nabin_faculty_install() {
+    itonics_nabin_faculty_schema();
+}
+
+function itonics_nabin_faculty_schema() {
+    $schema['itonics_nabin_faculty'] = [
+        'description' => 'Holds definitions for faculty.',
+        'fields' => [
+            'faculty_id' => [
+                'type' => 'serial',
+                'unsigned' => TRUE,
+                'not null' => TRUE,
+                'description' => 'Primary Key: Unique id for faculty.',
+            ],
+            'name' => [
+                'type' => 'varchar',
+                'length' => 255,
+                'not null' => TRUE,
+                'description' => 'Name of the faculty.',
+            ],
+            'code' => [
+                'type' => 'varchar',
+                'length' => 255,
+                'not null' => TRUE,
+                'description' => 'Unique identifier for the faculty.',
+            ],
+            'description' => [
+                'type' => 'text',
+                'size' => 'big',
+                'not null' => FALSE,
+                'description' => 'Rich text description of the student.'
+            ],
+            'created' => [
+                'type' => 'int',
+                'not null' => TRUE,
+                'default' => 0,
+                'description' => 'The UNIX timestamp when the student was created.'
+            ],
+            'changed' => [
+                'type' => 'int',
+                'not null' => TRUE,
+                'default' => 0,
+                'description' => 'The UNIX timestamp when the students data was updated.'
+            ],
+        ],
+        'primary key' => ['faculty_id'],
+        'unique keys' => [
+            'unique_code' => [
+                'code',
+            ],
+        ],
+    ];
+
+    return $schema;
+}

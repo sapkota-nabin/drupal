@@ -141,6 +141,8 @@ function itonics_nabin_teacher_update_7001() {
             'description' => 'References district.',
         ]);
     }
+
+    return "District ID added to teacher information table.";
 }
 
 function itonics_nabin_teacher_uninstall() {

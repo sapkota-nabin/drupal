@@ -1,0 +1,343 @@
+<?php
+
+function itonics_nabin_faculty_menu() {
+    $menus = [];
+
+    $menus['admin/itonics-nabin-faculty'] = [
+        'title' => 'ITONICS FACULTIES',
+        'description' => 'List all faculty',
+        'page callback' => 'itonics_nabin_faculty_list_page',
+        'access arguments' => ['view faculty'],
+        'type' => MENU_NORMAL_ITEM
+    ];
+
+    $menus['admin/itonics-nabin-faculty/add'] = [
+        'title' => 'Add faculty',
+        'description' => 'Add faculty',
+        'page callback' => 'itonics_nabin_faculty_form',
+        'access arguments' => ['add faculty'],
+        'type' => MENU_CALLBACK,
+    ];
+
+    $menus['admin/itonics-nabin-faculty/edit/%'] = [
+        'title' => 'Edit faculty',
+        'description' => 'Edit faculty',
+        'page callback' => 'itonics_nabin_faculty_update_form',
+        'page arguments' => [3],
+        'access arguments' => ['edit faculty'],
+        'type' => MENU_CALLBACK,
+    ];
+
+    $menus['admin/itonics-nabin-faculty/delete/%'] = [
+        'title' => 'Delete faculty',
+        'description' => 'Delete faculty',
+        'page callback' => 'drupal_get_form',
+        'page arguments' => ['itonics_nabin_faculty_delete_form', 3],
+        'access arguments' => ['delete faculty'],
+        'type' => MENU_CALLBACK,
+    ];
+
+//    $menus['admin/itonics-nabin-faculty/view/%'] = [
+//        'title' => 'View faculty',
+//        'description' => 'View faculty',
+//        'page callback' => 'itonics_nabin_faculty_view',
+//        'page arguments' => [3],
+//        'access arguments' => ['view faculty'],
+//        'type' => MENU_CALLBACK,
+//    ];
+
+    return $menus;
+}
+
+// PERMISSIONS
+function itonics_nabin_faculty_permission() {
+    return [
+        'view faculty' => [
+            'title' => 'View faculties',
+            'description' => 'View list of faculties.',
+        ],
+        'add new faculty' => [
+            'title' => 'Add faculty',
+            'description' => 'Add faculty',
+        ],
+        'edit faculty' => [
+            'title' => 'Edit faculty',
+            'description' => 'Update the faculty data',
+        ],
+        'delete faculty' => [
+            'title' => 'Delete faculty',
+            'description' => 'Delete the selected faculty.',
+        ],
+    ];
+}
+
+function itonics_nabin_faculty_list_page() {
+    ctools_include('ajax');
+    ctools_include('modal');
+    ctools_modal_add_js();
+    $headers = [
+        'name' => [
+            'data' => 'Name',
+            'field' => 'name',
+            'sort' => 'asc',
+        ],
+        'code' => [
+            'data' => 'Code',
+            'field' => 'code',
+        ],
+        'actions' => [
+            'data' => "Actions",
+        ],
+    ];
+
+    $rows = [];
+
+    $results = db_select('itonics_nabin_faculty', 'f')
+        ->extend('PagerDefault')
+        ->extend('TableSort')
+        ->fields('f')
+        ->limit(10)
+        ->orderByHeader($headers)
+        ->execute();
+
+    $can_edit = user_access('edit faculty');
+    $can_delete = user_access('delete faculty');
+    $can_add = user_access('add faculty');
+
+    foreach ($results as $row) {
+        $faculty_row = [
+            'name' => check_plain($row->name),
+            'code' => check_plain($row->code),
+        ];
+        $actions_markup = [];
+
+        if ($can_edit) {
+            $actions_markup[] = ctools_modal_text_button(
+                t('Edit'),
+                "admin/itonics-nabin-faculty/edit/{$row->faculty_id}",
+                t('Edit faculty')
+            );
+        }
+        if ($can_delete) {
+            $delete_url = url("admin/itonics-nabin-faculty/delete/{$row->faculty_id}");
+            $actions_markup[] = l(t('Delete'), $delete_url);
+        }
+
+        $faculty_row['actions'] = [
+            'data' => [
+                '#markup' => implode(' | ', $actions_markup),
+            ],
+        ];
+        $rows[] = $faculty_row;
+    }
+
+    $build['faculty_table'] = [
+        '#theme' => 'table',
+        '#header' => $headers,
+        '#rows' => $rows,
+        '#empty' => 'No faculties',
+    ];
+    $build['pager'] = [
+        '#theme' => 'pager',
+    ];
+
+    if ($can_add) {
+        $build['add_link'] = [
+            '#markup' => ctools_modal_text_button(t('Add Faculty'), 'admin/itonics-nabin-faculty/add', t('Faculty')),
+        ];
+    }
+
+    return $build;
+}
+
+/**
+ * Implements hook_form().
+ */
+function itonics_nabin_faculty_update_form($faculty_id) {
+    itonics_nabin_faculty_form($faculty_id);
+}
+
+function itonics_nabin_faculty_form($faculty_id = NULL) {
+    ctools_include('modal');
+    ctools_include('ajax');
+    $form_path = $faculty_id ?? "add";
+    $form_info = array(
+        'id' => "itonics_nabin_faculty_start_{$form_path}",
+        'path' => "itonics-nabin-faculty/{$form_path}/%step",
+        'show trail' => TRUE,
+        'show back' => TRUE,
+        'show cancel' => TRUE,
+        'show return' => FALSE,
+        'order' => array(
+            'start' => t('Choose faculty'),
+        ),
+        'forms' => array(
+            'start' => array(
+                'form id' => "itonics_nabin_faculty_start_{$form_path}",
+            ),
+        ),
+    );
+
+    $form_state['form_info'] = $form_info;
+    $form_state['faculty_id'] = $faculty_id;
+    ctools_include('wizard');
+    ctools_add_js('ajax-responder');
+    $form = drupal_build_form('itonics_nabin_faculty_start', $form_state);
+    $output = drupal_render($form);
+    $commands = ctools_modal_form_render($form_state, $output);
+    print ajax_render($commands);
+    exit;
+}
+
+function itonics_nabin_faculty_start($form, &$form_state) {
+    $faculty = null;
+
+    if (isset($form_state["faculty_id"]) && $form_state["faculty_id"]) {
+        $faculty = fetch_faculty($form_state["faculty_id"]);
+    }
+
+    return [
+        'name' => [
+            '#type' => 'textfield',
+            '#title' => 'Name',
+            '#required' => TRUE,
+            '#default_value' => !empty($faculty) ? $faculty->name : '',
+            '#prefix' => '<div id="faculty-name-wrapper">',
+            '#suffix' => '</div>',
+        ],
+        'code' => [
+            '#type' => 'textfield',
+            '#title' => 'Code',
+            '#required' => TRUE,
+            '#default_value' => !empty($faculty) ? $faculty->code : '',
+            '#prefix' => '<div id="faculty-code-wrapper">',
+            '#suffix' => '</div>',
+        ],
+        'description' => [
+            '#type' => 'text_format',
+            '#title' => 'Description',
+            '#format' => 'filtered_html',
+            '#default_value' => !empty($faculty) ? $faculty->description : NULL,
+            '#required' => FALSE,
+        ],
+        'submit' => [
+            '#type' => 'submit',
+            '#title' => 'Submit',
+            '#value' => 'Submit',
+            '#ajax' => [
+                'callback' => 'itonics_nabin_faculty_ajax_form_submit_callback',
+                'wrapper' => 'itonics-nabin-faculty-form-wrapper',
+            ]
+        ],
+        'faculty_id' => [
+            '#type' => 'value',
+            '#value' => !empty($faculty) ? $faculty->faculty_id : NULL,
+        ],
+    ];
+}
+
+
+function itonics_nabin_faculty_ajax_form_submit_callback($form, &$form_state) {
+    $commands = [];
+    $values = $form_state['values'];
+
+    $has_error = FALSE;
+    $fields = [
+        'name' => [
+            'wrapper' => '#faculty-name-wrapper',
+            'selector' => '#edit-name',
+            'message' => '<div class="custom-error">Faculty name is required.</div>',
+        ],
+        'code' => [
+            'wrapper' => '#faculty-code-wrapper',
+            'selector' => '#edit-code',
+            'message' => '<div class="custom-error" >Faculty code is required.</div>',
+        ],
+    ];
+
+    foreach ($fields as $key => $field) {
+        itonics_nabin_teacher_form_error_ajax_commands($commands, $field['wrapper'], NULL, $field['selector'], FALSE);
+        if (empty($values[$key])) {
+            $has_error = TRUE;
+            itonics_nabin_teacher_form_error_ajax_commands($commands, $field['wrapper'], $field['message'], $field['selector']);
+        }
+    }
+    // validate if the code is unique in database
+    $code_exists = fetch_faculty($values['code'], 'code');
+    if ($code_exists && $code_exists->faculty_id != $values['faculty_id']) {
+        $has_error = TRUE;
+        itonics_nabin_teacher_form_error_ajax_commands($commands, $field['wrapper'], '<div class="custom-error" >Faculty code is already taken.</div>', $field['selector'], FALSE);
+    }
+    if (!$has_error) {
+        store_or_update_faculty($form, $form_state);
+    }
+
+    return $has_error ? [
+        '#type' => 'ajax',
+        '#commands' => $commands,
+    ] : [
+        '#type' => 'ajax',
+        '#commands' => [
+            [
+                'command' => 'modal_dismiss',
+            ],
+            [
+                'command' => 'reload'
+            ]
+        ],
+    ];
+}
+
+function fetch_faculty($value, $field = 'faculty_id') {
+    return db_select('itonics_nabin_faculty', 'f')
+        ->fields('f')
+        ->condition($field, $value)
+        ->execute()
+        ->fetchObject();
+}
+
+function store_or_update_faculty($form, &$form_state) {
+    $values = $form_state['values'];
+    $fields = [
+        'name' => $values['name'],
+        'code' => $values['code'],
+        'description' => $values['description']['value'],
+    ];
+
+    if (empty($values['faculty_id'])) {
+        $fields['created'] = REQUEST_TIME;
+        drupal_write_record('itonics_nabin_faculty', $fields);
+        drupal_set_message('Faculty created successfully.');
+    } else {
+        $fields['faculty_id'] = $values['faculty_id'];
+        drupal_write_record('itonics_nabin_faculty', $fields, 'faculty_id');
+        drupal_set_message('Faculty updated successfully.');
+    }
+}
+
+function itonics_nabin_faculty_delete_form($form, &$form_state, $faculty_id) {
+    $form['faculty_id'] = [
+        '#type' => 'value',
+        '#value' => $faculty_id,
+    ];
+
+    return confirm_form(
+        form: $form,
+        question: t('Are you sure you want to delete this faculty?'),
+        path: 'admin/itonics-nabin-faculty',
+        description: t('This action cannot be undone.'),
+        yes: t('Delete'),
+        no: t('Cancel')
+    );
+}
+
+function itonics_nabin_faculty_delete_form_submit($form, &$form_state) {
+    $faculty_id = $form_state['values']['faculty_id'];
+
+    db_delete('itonics_nabin_faculty')
+        ->condition('faculty_id', $faculty_id)
+        ->execute();
+
+    drupal_set_message('Faculty deleted');
+    $form_state['redirect'] = 'admin/itonics-nabin-faculty';
+}
