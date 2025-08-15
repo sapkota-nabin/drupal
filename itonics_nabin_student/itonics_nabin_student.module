@@ -1,4 +1,5 @@
 <?php
+
 /**
  * @file
  * A custom module for adding functionality to Drupa
@@ -89,6 +90,28 @@ function itonics_nabin_student_permission() {
     ];
 }
 
+/**
+ * @param array $array
+ * @param array $except
+ * @return array
+ * Recursively maps arrays inside an iterable to take key value pairs
+ * except the provided keys
+ * Limitation: Assumes the elements inside iterable as arrays and skips elements if not array
+ */
+function array_except_recursive(array|object $iterable, array $except = []): array
+{
+    $return = [];
+    foreach ($iterable as $values) {
+        if (is_array($values)) {
+            $return[] = array_filter($values, function ($key) use ($except) {
+                return !in_array($key, $except);
+            }, ARRAY_FILTER_USE_KEY);
+        }
+    }
+    return $return;
+}
+
+
 function itonics_nabin_students_list() {
     global $genders, $grades;
 
@@ -130,14 +153,15 @@ function itonics_nabin_students_list() {
         ->extend('TableSort')
         ->fields('p')
         ->limit(10)
-        ->orderByHeader($headers)
-        ->execute();
+        ->orderByHeader($headers);
+    $results = $results->execute();
 
     $can_edit = user_access('edit students');
     $can_delete = user_access('delete students');
     $can_add = user_access('add students');
-
+    $fetched_rows = [];
     foreach ($results as $row) {
+        $fetched_rows[] = $row;
         $image = '';
         if (!empty($row->profile_picture)) {
             $file = file_load($row->profile_picture);
@@ -152,6 +176,7 @@ function itonics_nabin_students_list() {
         }
 
         $student_row = [
+            'student_id' => $row->student_id,
             'profile_picture' => $image,
             'first_name' => check_plain($row->first_name),
             'last_name' => check_plain($row->last_name),
@@ -187,10 +212,19 @@ function itonics_nabin_students_list() {
         }
         $rows[] = $student_row;
     }
+    $alter = [
+        "headers" => $headers,
+        "rows" => $rows,
+        "data" => $fetched_rows,
+    ];
+    $alter_data = module_invoke_all('itonics_nabin_students_list',$alter);
+    if (isset($alter_data["rows"])) {
+        $rows = array_except_recursive($alter_data["rows"], ['student_id']);
+    }
 
     $build['students_table'] = [
         '#theme' => 'table',
-        '#header' => $headers,
+        '#header' => $alter_data["headers"] ?? $headers,
         '#rows' => $rows,
         '#empty' => 'No students',
     ];
@@ -207,7 +241,7 @@ function itonics_nabin_students_list() {
     return $build;
 }
 
-function fetch_student($student_id) {
+function fetch_student(int $student_id) {
     return db_select('itonics_nabin_student_information', 'p')
         ->fields('p')
         ->condition('student_id', $student_id)
@@ -320,7 +354,7 @@ function itonics_nabin_student_form($form, &$form_state, $student_id = null) {
             $form_state['storage']['old_image'] = $student->profile_picture;
         }
     }
-
+    $form_state["student"] = $student;
     $form = [
         'first_name' => [
             '#type' => 'textfield',
@@ -339,14 +373,14 @@ function itonics_nabin_student_form($form, &$form_state, $student_id = null) {
             '#title' => 'Gender',
             '#options' => $genders,
             '#required' => TRUE,
-            '#default_value' => !empty($student) ? ($student->gender ? $genders[$student->gender] : '') : '',
+            '#default_value' => !empty($student) ? $student->gender : '',
         ],
         'grade' => [
             '#type' => 'radios',
             '#title' => 'Grade',
             '#options' => $grades,
             '#required' => TRUE,
-            '#default_value' => !empty($student) ? ($student->grade ? $grades[$student->grade] : '') : '',
+            '#default_value' => !empty($student) ? $student->grade : '',
         ],
         'profile_picture' => [
             '#type' => 'managed_file',
@@ -386,9 +420,12 @@ function itonics_nabin_student_form($form, &$form_state, $student_id = null) {
     return $form;
 }
 
+//function itonics_nabin_student_insert() {
+//
+//}
+
 function itonics_nabin_student_form_submit($form, &$form_state) {
     $values = $form_state['values'];
-
     $file = file_load($values['profile_picture']);
     $file->status = FILE_STATUS_PERMANENT;
     file_save($file);
@@ -403,12 +440,18 @@ function itonics_nabin_student_form_submit($form, &$form_state) {
         'profile_picture' => $profile_picture_id,
         'description' => filter_xss($values['description']['value']),
         'admission_date' => date($values['admission_date']),
-        'updated' => REQUEST_TIME,
+        'changed' => REQUEST_TIME,
     ];
+
+    drupal_alter('itonics_nabin_faculty_student_data', $fields, $form_state);
 
     if (empty($values['student_id'])) {
         $fields['created'] = REQUEST_TIME;
-        drupal_write_record('itonics_nabin_student_information', $fields);
+        $student_id = db_insert('itonics_nabin_student_information')->fields($fields)->execute();
+        $form_state['student_id'] = $student_id;
+        $message = "";
+        drupal_alter('itonics_nabin_faculty_message', $message);
+        watchdog('faculty_message', $message);
         drupal_set_message('Student created successfully.');
     } else {
         $fields['student_id'] = $values['student_id'];
@@ -418,8 +461,10 @@ function itonics_nabin_student_form_submit($form, &$form_state) {
             file_usage_delete($old_file, 'itonics_nabin_student', 'student_information', $values['student_id']);
             file_delete($old_file);
         }
+//        drupal_alter('itonics_nabin_student_form_submit', $fields);
         drupal_set_message('Student updated successfully.');
     }
+
 
     $form_state['redirect'] = 'admin/itonics-nabin-student';
 }

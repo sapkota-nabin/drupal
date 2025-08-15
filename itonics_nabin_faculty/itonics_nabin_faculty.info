@@ -4,6 +4,7 @@ package = Custom
 version = 1.0
 core = 7.x
 
+stylesheets[all][] = itonics-nabin-faculty.css
 dependencies[] = ctools
 dependencies[] = itonics_nabin_student
 dependencies[] = itonics_nabin_teacher
