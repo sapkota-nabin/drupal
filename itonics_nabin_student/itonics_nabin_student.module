@@ -18,6 +18,28 @@ $grades = [
     'C' => 'C',
     'D' => 'D',
 ];
+
+module_load_include("php", "itonics_nabin_student", "src/Controller/ItonicsNabinStudentController");
+module_load_include("php", "itonics_nabin_student", "src/Entities/ItonicsNabinStudentEntity");
+
+function itonics_nabin_student_entity_info() {
+    $info["itonics_nabin_student"] = [
+        "label" => "Itonics Nabin Student",
+        "controller class" => "ItonicsNabinStudentController",
+        "entity class" => "ItonicsNabinStudentEntity",
+        "base table" => "itonics_nabin_student_information",
+        "uri callback" => "itonics_nabin_student_uri",
+        "fieldable" => TRUE,
+        "entity keys" => [
+            "id" => "student_id",
+            "label" => "first_name",
+        ],
+        "static cache" => TRUE,
+    ];
+
+    return $info;
+}
+
 function itonics_nabin_student_menu() {
     $menus = [];
 
@@ -32,13 +54,12 @@ function itonics_nabin_student_menu() {
     $menus['admin/itonics-nabin-student/add'] = [
         'title' => 'Add Student',
         'description' => 'Add Student',
-        'page callback' => 'drupal_get_form',
-        'page arguments' => ['itonics_nabin_student_form'],
+        'page callback' => 'itonics_nabin_student_add',
         'access arguments' => ['add new student'],
         'type' => MENU_NORMAL_ITEM,
     ];
 
-    $menus['admin/itonics-nabin-student/edit/%'] = [
+    $menus['admin/itonics-nabin-student/edit/%itonics_nabin_student'] = [
         'title' => 'Edit Student',
         'description' => 'Edit student',
         'page callback' => 'drupal_get_form',
@@ -47,7 +68,7 @@ function itonics_nabin_student_menu() {
         'type' => MENU_CALLBACK,
     ];
 
-    $menus['admin/itonics-nabin-student/delete/%'] = [
+    $menus['admin/itonics-nabin-student/delete/%itonics_nabin_student'] = [
         'title' => 'Delete Student',
         'description' => 'Delete student',
         'page callback' => 'drupal_get_form',
@@ -56,7 +77,7 @@ function itonics_nabin_student_menu() {
         'type' => MENU_CALLBACK,
     ];
 
-    $menus['admin/itonics-nabin-student/view/%'] = [
+    $menus['admin/itonics-nabin-student/view/%itonics_nabin_student'] = [
         'title' => 'View Student',
         'description' => 'View Student',
         'page callback' => 'itonics_nabin_student_view',
@@ -66,6 +87,30 @@ function itonics_nabin_student_menu() {
     ];
 
     return $menus;
+}
+
+function itonics_nabin_student_add() {
+    $entity_default_data = [
+        "student_id" => 0,
+        "first_name" => "",
+        "last_name" => "",
+        "gender" => "",
+        "grade" => "",
+        "admission_date" => REQUEST_TIME,
+        "profile_picture" => 0,
+        "description" => "",
+        "created" => REQUEST_TIME,
+        "changed" => REQUEST_TIME,
+        "faculty_id" => 0,
+    ];
+    $entity = entity_get_controller("itonics_nabin_student")->create($entity_default_data);
+    return drupal_get_form('itonics_nabin_student_form', $entity);
+}
+
+function itonics_nabin_student_load($student_id = NULL, $reset = FALSE) {
+    $student_ids = isset($student_id) ? [$student_id] : [];
+    $student = entity_load("itonics_nabin_student", $student_ids, [], $reset);
+    return $student ? reset($student) : FALSE;
 }
 
 // PERMISSIONS
@@ -148,13 +193,7 @@ function itonics_nabin_students_list() {
 
     $rows = [];
 
-    $results = db_select('itonics_nabin_student_information', 'p')
-        ->extend('PagerDefault')
-        ->extend('TableSort')
-        ->fields('p')
-        ->limit(10)
-        ->orderByHeader($headers);
-    $results = $results->execute();
+    $results = entity_get_controller("itonics_nabin_student")->listAll($headers);
 
     $can_edit = user_access('edit students');
     $can_delete = user_access('delete students');
@@ -182,7 +221,7 @@ function itonics_nabin_students_list() {
             'last_name' => check_plain($row->last_name),
             'gender' => $row->gender ? $genders[$row->gender] : null,
             'grade' => $row->grade ? $grades[$row->grade] : null,
-            'admission_date' => format_date(strtotime($row->admission_date), 'custom', 'Y-m-d'),
+            'admission_date' => format_date($row->admission_date, 'custom', 'Y-m-d'),
             'actions' => [
                 'data' => [
                     '#theme' => 'links',
@@ -241,17 +280,8 @@ function itonics_nabin_students_list() {
     return $build;
 }
 
-function fetch_student(int $student_id) {
-    return db_select('itonics_nabin_student_information', 'p')
-        ->fields('p')
-        ->condition('student_id', $student_id)
-        ->execute()
-        ->fetchObject();
-}
-
-function itonics_nabin_student_view($student_id) {
+function itonics_nabin_student_view($student) {
     global $genders, $grades;
-    $student = fetch_student($student_id);
 
     if (!$student) {
         return drupal_not_found();
@@ -310,7 +340,7 @@ function itonics_nabin_student_view($student_id) {
                         'data' => 'Admission Date',
                         'header' => TRUE,
                     ],
-                    format_date(strtotime($student->admission_date), 'long'),
+                    format_date($student->admission_date, 'long'),
                 ],
             ],
         ],
@@ -327,10 +357,10 @@ function itonics_nabin_student_view($student_id) {
 
     $markup = '<div class="actions">';
     if (user_access('edit student')) {
-        $markup .= l(t('Edit'), 'admin/itonics-nabin-student/edit/' . $student_id);
+        $markup .= l(t('Edit'), 'admin/itonics-nabin-student/edit/' . $student->student_id);
     }
     if (user_access('delete student')) {
-        $markup .= ' | ' . l(t('Delete'), 'admin/itonics-nabin-student/delete/' . $student_id) . ' | ';
+        $markup .= ' | ' . l(t('Delete'), 'admin/itonics-nabin-student/delete/' . $student->student_id) . ' | ';
     }
 
     $markup .= l(t('Back to list'), 'admin/itonics-nabin-student'). '</div>';
@@ -341,18 +371,12 @@ function itonics_nabin_student_view($student_id) {
     return $student_view;
 }
 
-function itonics_nabin_student_form($form, &$form_state, $student_id = null) {
+function itonics_nabin_student_form($form, &$form_state, $student = NULL) {
     global $genders, $grades;
     $form = [];
 
-    $student = null;
-
-    if ($student_id) {
-        $student = fetch_student($student_id);
-
-        if (!empty($student->profile_picture)) {
-            $form_state['storage']['old_image'] = $student->profile_picture;
-        }
+    if (!is_null($student) && !empty($student->profile_picture)) {
+        $form_state['storage']['old_image'] = $student->profile_picture;
     }
     $form_state["student"] = $student;
     $form = [
@@ -396,7 +420,7 @@ function itonics_nabin_student_form($form, &$form_state, $student_id = null) {
             '#type' => 'date_popup',
             '#title' => 'Admission Date',
             '#date_format' => 'Y-m-d',
-            '#default_value' => !empty($student) ? format_date(strtotime($student->admission_date), 'custom', 'Y-m-d') : NULL,
+            '#default_value' => !empty($student) ? format_date($student->admission_date, 'custom', 'Y-m-d') : NULL,
             '#required' => TRUE
         ],
         'description' => [
@@ -415,17 +439,18 @@ function itonics_nabin_student_form($form, &$form_state, $student_id = null) {
             '#type' => 'value',
             '#value' => !empty($student) ? $student->student_id : NULL,
         ],
+        'entity' => [
+            '#type' => 'value',
+            '#value' => $student,
+        ]
     ];
 
     return $form;
 }
 
-//function itonics_nabin_student_insert() {
-//
-//}
-
 function itonics_nabin_student_form_submit($form, &$form_state) {
     $values = $form_state['values'];
+    $entity = $values['entity'];
     $file = file_load($values['profile_picture']);
     $file->status = FILE_STATUS_PERMANENT;
     file_save($file);
@@ -439,29 +464,27 @@ function itonics_nabin_student_form_submit($form, &$form_state) {
         'grade' => filter_xss($values['grade']),
         'profile_picture' => $profile_picture_id,
         'description' => filter_xss($values['description']['value']),
-        'admission_date' => date($values['admission_date']),
+        'admission_date' => strtotime($values['admission_date']),
         'changed' => REQUEST_TIME,
     ];
 
     drupal_alter('itonics_nabin_faculty_student_data', $fields, $form_state);
 
+    foreach ($fields as $field => $value) {
+        $entity->{$field} = $value;
+    }
+
     if (empty($values['student_id'])) {
-        $fields['created'] = REQUEST_TIME;
-        $student_id = db_insert('itonics_nabin_student_information')->fields($fields)->execute();
-        $form_state['student_id'] = $student_id;
-        $message = "";
-        drupal_alter('itonics_nabin_faculty_message', $message);
-        watchdog('faculty_message', $message);
-        drupal_set_message('Student created successfully.');
+        $entity->created = REQUEST_TIME;
+        entity_save('itonics_nabin_student', $entity);
     } else {
         $fields['student_id'] = $values['student_id'];
-        drupal_write_record('itonics_nabin_student_information', $fields, 'student_id');
+        entity_save("itonics_nabin_student", $entity);
         if (!empty($form_state['storage']['old_image'])) {
             $old_file = file_load($form_state['storage']['old_image']);
             file_usage_delete($old_file, 'itonics_nabin_student', 'student_information', $values['student_id']);
             file_delete($old_file);
         }
-//        drupal_alter('itonics_nabin_student_form_submit', $fields);
         drupal_set_message('Student updated successfully.');
     }
 
@@ -469,10 +492,10 @@ function itonics_nabin_student_form_submit($form, &$form_state) {
     $form_state['redirect'] = 'admin/itonics-nabin-student';
 }
 
-function itonics_nabin_student_delete_form($form, &$form_state, $student_id) {
-    $form['student_id'] = [
+function itonics_nabin_student_delete_form($form, &$form_state, $student) {
+    $form['student'] = [
         '#type' => 'value',
-        '#value' => $student_id,
+        '#value' => $student,
     ];
 
     return confirm_form(
@@ -486,21 +509,16 @@ function itonics_nabin_student_delete_form($form, &$form_state, $student_id) {
 }
 
 function itonics_nabin_student_delete_form_submit($form, &$form_state) {
-    $student_id = $form_state['values']['student_id'];
-
-    $student = fetch_student($student_id);
+    $student = $form_state['values']['student'];
 
     if (!empty($student->profile_picture)) {
         $file = file_load($student->profile_picture);
         if ($file) {
-            file_usage_delete($file, 'itonics_nabin_student', 'student_information', $student_id);
+            file_usage_delete($file, 'itonics_nabin_student', 'student_information', $student->student_id);
             file_delete($file);
         }
     }
-
-    db_delete('itonics_nabin_student_information')
-        ->condition('student_id', $student_id)
-        ->execute();
+    entity_delete("itonics_nabin_student", $student->student_id);
 
     drupal_set_message('Student deleted');
     $form_state['redirect'] = 'admin/itonics-nabin-student';

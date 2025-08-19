@@ -49,8 +49,7 @@ function itonics_nabin_student_schema() {
                 'description' => 'Grade of the student. Example (A, A+, B, C).',
             ],
             'admission_date' => [
-                'type' => 'datetime',
-                'mysql_type' => 'DATETIME',
+                'type' => 'int',
                 'not null' => TRUE,
                 'description' => 'Date of addmission of the student.',
             ],
