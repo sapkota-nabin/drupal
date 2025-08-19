@@ -49,6 +49,22 @@ function itonics_nabin_faculty_menu() {
     return $menus;
 }
 
+function itonics_nabin_faculty_theme($existing, $type, $theme, $path)
+{
+    return [
+        "faculty_list" => [
+            "variables" => [
+                "rows" => [],
+                'can_add' => FALSE,
+                'add_link' => '',
+            ],
+            "template" => "faculty-list",
+            "path" => drupal_get_path("module", "itonics_nabin_faculty") . "/templates",
+        ],
+    ];
+}
+
+
 // PERMISSIONS
 function itonics_nabin_faculty_permission() {
     return [
@@ -70,8 +86,198 @@ function itonics_nabin_faculty_permission() {
         ],
     ];
 }
+function get_all_faculties_query($headers = [], $pagination = FALSE, $order = FALSE, $limit = 0, $sort = FALSE, $fields = []) {
+    $query = db_select('itonics_nabin_faculty', 'f');
+    if ($pagination) {
+        $query->extend("PagerDefault");
+    }
+    if ($sort) {
+        $query->extend("TableSort");
+    }
+    if ($order && count($headers)) {
+        $query->orderByHeader($headers);
+    }
+    if ($limit > 0) {
+        $query->limit($limit);
+    }
+    return $query->fields(count($fields) ? $fields : 'f')->execute();
+}
+
+function array_find_first(array $array, string|int $field, mixed $value): array|object|null
+{
+    $filtered = array_filter($array, function($item) use ($field, $value) {
+        if (is_array($item)) {
+            return isset($item[$field]) && $item[$field] === $value;
+        } elseif (is_object($item)) {
+            return property_exists($item, $field) && $item->$field === $value;
+        }
+    });
+    return reset($filtered) ?: null;
+}
+
+
+function itonics_nabin_faculty_itonics_nabin_students_list($alter) {
+    $rows = $alter["rows"];
+    $headers = $alter["headers"];
+    $query_results = $alter["data"];
+    $headers["faculty_id"] = [
+            "data" => "Faculty",
+            "field" => "faculty_id",
+    ];
+    $alteredRows = [];
+    foreach ($rows as $row) {
+        $queryResult = array_find_first($query_results, "student_id", $row["student_id"]);
+
+        $facultyId = $queryResult->faculty_id ?? null;
+        $faculty = null;
+        if ($facultyId) {
+            $faculty = fetch_faculty($facultyId);
+        }
+        $row["faculty_id"] = $faculty ? $faculty->name : NULL;
+        $alteredRows[] = $row;
+    }
+
+    $alter["rows"] = $alteredRows;
+    $alter["headers"] = $headers;
+
+    return $alter;
+}
+
+function get_faculty_for_form_element() {
+    $faculties = get_all_faculties_query();
+    $faculty_options = [];
+    foreach ($faculties as $faculty) {
+        $faculty_options[$faculty->faculty_id] = $faculty->name;
+    }
+
+    return $faculty_options;
+}
+
+function itonics_nabin_faculty_form_alter(&$form, &$form_state, $form_id) {
+    if ($form_id === 'itonics_nabin_student_form') {
+        $faculty_options = get_faculty_for_form_element();
+
+        $form['faculty_id'] = [
+            '#type' => 'select',
+            '#title' => 'Select Faculty',
+            '#options' => $faculty_options,
+            '#default_value' => !empty($form_state["student"]) ? $form_state["student"]->faculty_id : NULL,
+            '#prefix' => '<div id="student-faculty-code-wrapper">',
+            '#suffix' => '</div>',
+            '#weight' => 0,
+        ];
+    }
+
+    if ($form_id === 'itonics_nabin_teacher_form') {
+        $faculty_options = get_faculty_for_form_element();
+        $form['faculties'] = [
+            '#type' => 'checkboxes',
+            '#title' => 'Faculties',
+            '#options' => $faculty_options,
+            '#prefix' => '<div id="teacher-faculties-checkbox-wrapper">',
+            '#suffix' => '</div>',
+            '#default_value' => !empty($form_state["teacher"]) ? @unserialize($form_state["teacher"]->faculties) : [],
+            '#weight' => 0,
+        ];
+    }
+}
+
+function itonics_nabin_faculty_form_itonics_nabin_student_alter(&$form, &$form_state) {
+    var_dump($form);
+    var_dump($form_state);
+}
+
+
+function itonics_nabin_faculty_itonics_nabin_faculty_message_alter(&$message) {
+    $message = "Student Faculty information has been added successfully.";
+}
+
+function itonics_nabin_faculty_itonics_nabin_faculty_student_data_alter(&$fields, &$form_state) {
+    $fields['faculty_id'] = $form_state['values']['faculty_id'];
+}
 
 function itonics_nabin_faculty_list_page() {
+    ctools_include('ajax');
+    ctools_include('modal');
+    ctools_modal_add_js();
+    $can_edit   = user_access('edit faculty');
+    $can_delete = user_access('delete faculty');
+    $can_add    = user_access('add faculty');
+
+    $faculties = db_query('SELECT * FROM {itonics_nabin_faculty}')->fetchAllAssoc('faculty_id');
+
+    $students = db_query('SELECT * FROM {itonics_nabin_student_information} WHERE faculty_id IN (:ids)', [
+        ':ids' => array_keys($faculties),
+    ])->fetchAll();
+    $faculty_students = [];
+    foreach ($students as $student) {
+        $faculty_students[$student->faculty_id][] = $student;
+    }
+
+    $teachers = db_query('SELECT * FROM {itonics_nabin_teacher_information}')->fetchAll();
+    $faculty_teachers = [];
+    foreach ($teachers as $teacher) {
+        if (!empty($teacher->faculties)) {
+            $faculty_ids = unserialize($teacher->faculties);
+            if (is_array($faculty_ids)) {
+                foreach ($faculty_ids as $fid) {
+                    if (isset($faculties[$fid])) {
+                        $faculty_teachers[$fid][] = $teacher;
+                    }
+                }
+            }
+        }
+    }
+
+    $rows = [];
+    foreach ($faculties as $fid => $faculty) {
+        $student_names = [];
+        if (!empty($faculty_students[$fid])) {
+            foreach ($faculty_students[$fid] as $s) {
+                $student_names[] = check_plain($s->first_name . ' ' . $s->last_name);
+            }
+        }
+
+        $teacher_names = [];
+        if (!empty($faculty_teachers[$fid])) {
+            foreach ($faculty_teachers[$fid] as $t) {
+                $teacher_names[] = check_plain($t->first_name . ' ' . $t->last_name);
+            }
+        }
+
+        $actions_markup = [];
+        if ($can_edit) {
+            $actions_markup[] = ctools_modal_text_button(
+                t('Edit'),
+                "admin/itonics-nabin-faculty/edit/{$fid}",
+                t('Edit faculty')
+            );
+        }
+        if ($can_delete) {
+            $delete_url = url("admin/itonics-nabin-faculty/delete/{$fid}");
+            $actions_markup[] = l(t('Delete'), $delete_url);
+        }
+
+        $rows[] = [
+            'name'     => check_plain($faculty->name),
+            'code'     => check_plain($faculty->code),
+            'students' => implode(', ', $student_names),
+            'teachers' => implode(', ', $teacher_names),
+            'actions'  => implode(' | ', $actions_markup),
+        ];
+    }
+
+    return theme('faculty_list', [
+        'rows' => $rows,
+        'can_add' => $can_add,
+        'add_link' => $can_add
+            ? ctools_modal_text_button(t('Add Faculty'), 'admin/itonics-nabin-faculty/add', t('Faculty'))
+            : '',
+    ]);
+}
+
+
+function itonics_nabin_faculty_list_page_1() {
     ctools_include('ajax');
     ctools_include('modal');
     ctools_modal_add_js();

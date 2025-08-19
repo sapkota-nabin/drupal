@@ -60,3 +60,54 @@ function itonics_nabin_faculty_schema() {
 
     return $schema;
 }
+
+// Ideally if pre planned can use schema alter during the time of installation of this module.
+// In case of already installed module use hook_update_N() for altering database.
+function itonics_nabin_faculty_schema_alter(&$schema) {
+    // students
+    if (isset($schema['itonics_nabin_student_information'])) {
+        $schema['itonics_nabin_student_information']['fields']['faculty_id'] = [
+            'type' => 'int',
+            'not null' => FALSE,
+            'description' => 'The id of faculty the student belongs to.'
+        ];
+
+        // index if necessary
+    }
+
+    // teacher module
+    if (isset($schema['itonics_nabin_teacher_information'])) {
+        $schema['itonics_nabin_teacher_information']['fields']['faculties'] = [
+             'type' => 'varchar',
+             'length' => 255,
+             'not null' => FALSE,
+             'description' => 'Faculties of the teacher.',
+        ];
+    }
+}
+
+// hook_update_N() equivalent of hook_schema_alter();
+function itonics_nabin_faculty_update_7001() {
+    // student
+    $student_faculty_field = [
+        'type' => 'int',
+        'not null' => FALSE,
+        'description' => 'The id of faculty the student belongs to.'
+    ];
+
+    if (!db_field_exists('itonics_nabin_student_information', 'faculty_id')) {
+        db_add_field('itonics_nabin_student_information', 'faculty_id', $student_faculty_field);
+    }
+
+    // teacher
+    $teacher_faculty_field =  [
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => FALSE,
+        'description' => 'Faculties of the teacher.',
+    ];
+
+    if (!db_field_exists('itonics_nabin_teacher_information', 'faculties')) {
+        db_add_field('itonics_nabin_teacher_information', 'faculties', $teacher_faculty_field);
+    }
+}
