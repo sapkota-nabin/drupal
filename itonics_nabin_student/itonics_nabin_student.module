@@ -103,7 +103,7 @@ function itonics_nabin_student_add() {
         "changed" => REQUEST_TIME,
         "faculty_id" => 0,
     ];
-    $entity = entity_get_controller("itonics_nabin_student")->create($entity_default_data);
+    $entity = entity_get_controller("itonics_nabin_student")->getNewEntityObject();
     return drupal_get_form('itonics_nabin_student_form', $entity);
 }
 

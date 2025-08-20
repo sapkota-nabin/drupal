@@ -50,8 +50,7 @@ function itonics_nabin_teacher_schema() {
                     'description' => 'Job type of the teacher. Example (full time, part time).',
                 ],
                 'join_date' => [
-                    'type' => 'datetime',
-                    'mysql_type' => 'DATETIME',
+                    'type' => 'int',
                     'not null' => TRUE,
                     'description' => 'Date of joining of the teacher.',
                 ],

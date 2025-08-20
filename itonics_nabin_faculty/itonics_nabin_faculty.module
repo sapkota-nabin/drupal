@@ -103,6 +103,13 @@ function get_all_faculties_query($headers = [], $pagination = FALSE, $order = FA
     return $query->fields(count($fields) ? $fields : 'f')->execute();
 }
 
+function itonics_nabin_faculty_itonics_nabin_student_insert($student) {
+//    var_dump($student);
+    // Here we get the recently created (INSERTED) student object
+    // which we can use extract the faculty id from the student
+    // and process it further
+}
+
 function array_find_first(array $array, string|int $field, mixed $value): array|object|null
 {
     $filtered = array_filter($array, function($item) use ($field, $value) {
@@ -170,13 +177,14 @@ function itonics_nabin_faculty_form_alter(&$form, &$form_state, $form_id) {
 
     if ($form_id === 'itonics_nabin_teacher_form') {
         $faculty_options = get_faculty_for_form_element();
+        $entity = $form_state["entity"];
         $form['faculties'] = [
             '#type' => 'checkboxes',
             '#title' => 'Faculties',
             '#options' => $faculty_options,
             '#prefix' => '<div id="teacher-faculties-checkbox-wrapper">',
             '#suffix' => '</div>',
-            '#default_value' => !empty($form_state["teacher"]) ? @unserialize($form_state["teacher"]->faculties) : [],
+            '#default_value' => !empty($form_state["entity"]) ? @unserialize($form_state["entity"]->faculties) : [],
             '#weight' => 0,
         ];
     }
@@ -192,8 +200,21 @@ function itonics_nabin_faculty_itonics_nabin_faculty_message_alter(&$message) {
     $message = "Student Faculty information has been added successfully.";
 }
 
-function itonics_nabin_faculty_itonics_nabin_faculty_student_data_alter(&$fields, &$form_state) {
+function itonics_nabin_faculty_itonics_nabin_faculty_student_data_alter(&$fields, &$form_state): void
+{
     $fields['faculty_id'] = $form_state['values']['faculty_id'];
+}
+
+function itonics_nabin_faculty_itonics_nabin_faculty_teacher_data_alter(&$fields, &$form_state): void
+{
+    $fields['faculties'] = isset($form_state['values']['faculties'])
+        ? serialize($form_state['values']['faculties'])
+        : NULL;
+}
+
+function itonics_nabin_faculty_itonics_nabin_student_entity_default_values_alter(&$entity_default_data): void
+{
+    $entity_default_data["faculty_id"] = 0;
 }
 
 function itonics_nabin_faculty_list_page() {
