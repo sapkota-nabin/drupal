@@ -1,6 +1,9 @@
 <?php if ($can_add): ?>
     <div class="faculty-add">
-        <?php print $add_link; ?>
+<!--        --><?php //print $add_link; ?>
+        <?php
+            print l('Add Faculty', 'admin/itonics-nabin-faculty/add');
+        ?>
     </div>
 <?php endif; ?>
 
