@@ -80,11 +80,12 @@ class ItonicsNabinFacultyController extends EntityAPIController
 
             $actions_markup = [];
             if ($can_edit) {
-                $actions_markup[] = ctools_modal_text_button(
-                    t('Edit'),
-                    "admin/itonics-nabin-faculty/edit/{$fid}",
-                    t('Edit faculty')
-                );
+//                $actions_markup[] = ctools_modal_text_button(
+//                    t('Edit'),
+//                    "admin/itonics-nabin-faculty/edit/{$fid}",
+//                    t('Edit faculty')
+//                );
+                $actions_markup[] = l(t("Edit"), url("admin/itonics-nabin-faculty/edit/{$fid}"));
             }
             if ($can_delete) {
                 $delete_url = url("admin/itonics-nabin-faculty/delete/{$fid}");

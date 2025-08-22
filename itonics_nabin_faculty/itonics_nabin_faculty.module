@@ -49,8 +49,8 @@ function itonics_nabin_faculty_menu() {
     $menus['admin/itonics-nabin-faculty/edit/%itonics_nabin_faculty'] = [
         'title' => 'Edit faculty',
         'description' => 'Edit faculty',
-        'page callback' => 'itonics_nabin_faculty_update_form',
-        'page arguments' => [3],
+        'page callback' => 'drupal_get_form',
+        'page arguments' => ["itonics_nabin_faculty_form_classic", 3],
         'access arguments' => ['edit faculty'],
         'type' => MENU_CALLBACK,
     ];
@@ -194,7 +194,8 @@ function itonics_nabin_faculty_itonics_nabin_students_list($alter) {
         $facultyId = $queryResult->faculty_id ?? null;
         $faculty = null;
         if ($facultyId) {
-            $faculty = entity_load("itonics_nabin_faculty", $facultyId);
+            $faculty = entity_load_single("itonics_nabin_faculty", $facultyId);
+//            $faculty = entity_load("itonics_nabin_faculty", [$facultyId]);
         }
         $row["faculty_id"] = $faculty ? $faculty->name : NULL;
         $alteredRows[] = $row;
