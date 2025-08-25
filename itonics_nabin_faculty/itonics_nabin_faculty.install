@@ -111,3 +111,38 @@ function itonics_nabin_faculty_update_7001() {
         db_add_field('itonics_nabin_teacher_information', 'faculties', $teacher_faculty_field);
     }
 }
+
+function itonics_nabin_faculty_update_7002() {
+    $field = [
+        "field_name" => "faculty_image",
+        "type" => "image",
+        "entity_types" => [
+            "itonics_nabin_faculty",
+        ],
+        "cardinality" => 1,
+        "module" => "itonics_nabin_faculty",
+        "settings" => [
+            "url_scheme" => "public",
+            "default_image" => 0,
+        ],
+    ];
+    field_create_field($field);
+
+    field_create_instance([
+        "field_name" => "faculty_image",
+        "entity_type" => "itonics_nabin_faculty",
+        "bundle" => "itonics_nabin_faculty",
+        "label" => "Faculty Image",
+        "description" => "Upload faculty profile picture",
+        "required" => FALSE,
+        "widget" => [
+            "type" => "image_image",
+            "settings" => [
+                "preview_image_style" => "thumbnail",
+                "progress_indicator" => "throbber",
+            ],
+        ],
+    ]);
+
+    return "Fields added to itonics nabin faculty using field api.";
+}

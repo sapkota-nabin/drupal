@@ -8,13 +8,62 @@ $job_types = [
     'part-time' => 'Part Time',
 ];
 // for future MVC tryout
-// module_load_include('php', 'itonics_nabin_teacher', 'src/TeacherServiceContainer');
+module_load_include('php', 'itonics_nabin_teacher', 'src/Controllers/ItonicsNabinTeacherEntityBaseController');
+module_load_include('php', 'itonics_nabin_teacher', 'src/Controllers/ItonicsNabinTeacherController');
+module_load_include('php', 'itonics_nabin_teacher', 'src/Controllers/ItonicsNabinStateController');
+module_load_include('php', 'itonics_nabin_teacher', 'src/Controllers/ItonicsNabinDistrictController');
+module_load_include('php', 'itonics_nabin_teacher', 'src/Entities/ItonicsNabinTeacherEntity');
+module_load_include('php', 'itonics_nabin_teacher', 'src/Entities/ItonicsNabinStateEntity');
+module_load_include('php', 'itonics_nabin_teacher', 'src/Entities/ItonicsNabinDistrictEntity');
 // ajax_command_invoke() for validation and submit
+
 function itonics_nabin_teacher_init() {
     // invoke for first time only
-//    itonis_nabin_teacher_insert_sample_data();
+//    itonics_nabin_teacher_insert_sample_data();
 }
 
+/**
+ * @return array
+ */
+function itonics_nabin_teacher_entity_info(): array
+{
+    $info["itonics_nabin_teacher"] = [
+        "label" => "Itonics Nabin Teacher",
+        "controller class" => "ItonicsNabinTeacherController",
+        "entity class" => "ItonicsNabinTeacherEntity",
+        "base table" => "itonics_nabin_teacher_information",
+        "fieldable" => TRUE,
+        "entity keys" => [
+            "id" => "teacher_id",
+            "label" => "first_name",
+        ],
+        "static cache" => TRUE,
+    ];
+    $info["itonics_nabin_state"] = [
+        "label" => "Itonics Nabin States",
+        "controller class" => "ItonicsNabinStateController",
+        "entity class" => "ItonicsNabinStateEntity",
+        "base table" => "itonics_nabin_states",
+        "fieldable" => TRUE,
+        "entity keys" => [
+            "id" => "state_id",
+        ],
+        "static cache" => TRUE,
+    ];
+    $info["itonics_nabin_district"] = [
+        "label" => "Itonics Nabin Districts",
+        "controller class" => "ItonicsNabinDistrictController",
+        "entity class" => "ItonicsNabinDistrictEntity",
+        "base table" => "itonics_nabin_district",
+        "fieldable" => TRUE,
+        "entity keys" => [
+            "id" => "district_id",
+        ],
+        "static cache" => TRUE,
+    ];
+
+    return $info;
+}
 
 /**
  * Inserts sample data in `itonics_nabin_states` and `itonics_nabin_district` tables
@@ -23,99 +72,17 @@ function itonics_nabin_teacher_init() {
  * @return void
  * @throws Exception
  */
-function itonis_nabin_teacher_insert_sample_data() {
-    $states_query = db_select('itonics_nabin_states', 's');
-    $states_query->addExpression('COUNT(state_id)', 'total_states');
-    $states = $states_query->execute()->fetchField();
-
-    if ($states == 0) {
-        $query =  db_insert('itonics_nabin_states')
-            ->fields(['state_name']);
-        foreach (['Koshi', 'Madhesh', 'Bagmati', 'Gandaki', 'Lumbini', 'Karnali', 'Sudurpashchim'] as $state) {
-            $query->values(['state_name' => $state]);
-        }
-
-        $query->execute();
-    }
-
-    $states = db_select('itonics_nabin_states', 's')
-        ->fields('s')
-        ->execute()
-        ->fetchAllAssoc('state_id');
-
-    $regions_count_query = db_select('itonics_nabin_district', 'r');
-    $regions_count_query->addExpression('COUNT(district_id)', 'total_regions');
-    $regions_count = $regions_count_query->execute()->fetchField();
-
-    if ($regions_count == 0) {
-        $sample_regions = [
-            'Koshi' => [
-                'Morang',
-                'Sunsari',
-                'Jhapa',
-            ],
-            'Madhesh' => [
-                'Dhanusha',
-                'Sarlahi',
-                'Bara',
-            ],
-            'Bagmati' => [
-                'Kathmandu',
-                'Chitwan',
-                'Makwanpur',
-            ],
-            'Gandaki' => [
-                'Baglung',
-                'Gorkha',
-                'Kaski',
-            ],
-            'Lumbini' => [
-                'Kapilvastu',
-                'Parasi',
-                'Rupandehi',
-            ],
-            'Karnali' => [
-                'Humla',
-                'Jumla',
-                'Kalikot',
-            ],
-            'Sudurpashchim' => [
-                'Achham',
-                'Darchula',
-                'Bajhang',
-            ],
-        ];
-        $districts_insert_data = [];
-        foreach ($states as $state) {
-            $state_wise_districts = $sample_regions[$state->state_name] ?? [];
-            if (count($state_wise_districts)) {
-                foreach ($state_wise_districts as $district) {
-                    $districts_insert_data[] = [
-                        'state_id' => $state->state_id,
-                        'district_name' => $district,
-                    ];
-                }
-            }
-        }
-
-        if (count($districts_insert_data)) {
-            $district_insert_query = db_insert('itonics_nabin_district')
-                ->fields(['district_name', 'state_id']);
-
-            foreach ($districts_insert_data as $district_data) {
-                $district_insert_query->values($district_data);
-            }
-
-            $district_insert_query->execute();
-        }
-    }
+function itonics_nabin_teacher_insert_sample_data(): void
+{
+    entity_get_controller("itonics_nabin_teacher")->populateSampleDataForStatesAndDistricts();
 }
 
 
 /**
  * @return array[]
  */
-function itonics_nabin_teacher_menu() {
+function itonics_nabin_teacher_menu(): array
+{
     return [
         'admin/itonics-nabin-teachers' => [
             'title' => 'ITONICS TEACHERS',
@@ -127,12 +94,12 @@ function itonics_nabin_teacher_menu() {
         'admin/itonics-nabin-teacher/add' => [
             'title' => 'Add Teacher',
             'description' => 'Add teacher',
-            'page callback' => 'drupal_get_form',
-            'page arguments' => ['itonics_nabin_teacher_form'],
+            'page callback' => 'itonics_nabin_teacher_add',
+//            'page arguments' => ['itonics_nabin_teacher_form'],
             'access arguments' => ['add new teacher'],
             'type' => MENU_NORMAL_ITEM,
         ],
-        'admin/itonics-nabin-teacher/edit/%' => [
+        'admin/itonics-nabin-teacher/edit/%itonics_nabin_teacher' => [
             'title' => 'Edit Teacher',
             'description' => 'Edit teacher',
             'page callback' => 'drupal_get_form',
@@ -140,7 +107,7 @@ function itonics_nabin_teacher_menu() {
             'access arguments' => ['edit teacher'],
             'type' => MENU_CALLBACK,
         ],
-        'admin/itonics-nabin-teacher/delete/%' => [
+        'admin/itonics-nabin-teacher/delete/%itonics_nabin_teacher' => [
             'title' => 'Delete Teacher',
             'description' => 'Delete Teacher',
             'page callback' => 'drupal_get_form',
@@ -148,7 +115,7 @@ function itonics_nabin_teacher_menu() {
             'access arguments' => ['delete teacher'],
             'type' => MENU_CALLBACK,
         ],
-        'admin/itonics-nabin-teacher/view/%' => [
+        'admin/itonics-nabin-teacher/view/%itonics_nabin_teacher' => [
             'title' => 'View Teacher',
             'description' => 'View Teacher',
             'page callback' => 'itonics_nabin_teacher_view',
@@ -159,8 +126,31 @@ function itonics_nabin_teacher_menu() {
     ];
 }
 
+/**
+ * @return array|mixed|null
+ * @throws EntityMalformedException
+ */
+function itonics_nabin_teacher_add(): mixed
+{
+    $newTeacher = entity_get_controller("itonics_nabin_teacher")->getNewTeacher();
+    return drupal_get_form('itonics_nabin_teacher_form', $newTeacher);
+}
 
-function itonics_nabin_teacher_permission() {
+/**
+ * @return false|mixed
+ */
+function itonics_nabin_teacher_load($teacher_id = NULL, $reset = FALSE): mixed
+{
+    $teacher_ids = isset($teacher_id) ? [$teacher_id] : [];
+    $teacher = entity_load("itonics_nabin_teacher", $teacher_ids, [], $reset);
+    return $teacher ? reset($teacher) : FALSE;
+}
+
+/**
+ * @return array[]
+ */
+function itonics_nabin_teacher_permission(): array
+{
     return [
         'view teachers' => [
             'title' => 'View teachers',
@@ -181,7 +171,12 @@ function itonics_nabin_teacher_permission() {
     ];
 }
 
-function itonics_nabin_teacher_list() {
+/**
+ * @return array
+ * @throws Exception
+ */
+function itonics_nabin_teacher_list(): array
+{
     global $genders, $job_types;
     $headers = [
         'profile_picture' => [
@@ -216,13 +211,7 @@ function itonics_nabin_teacher_list() {
 
     $rows = [];
 
-    $results = db_select('itonics_nabin_teacher_information', 't')
-        ->extend('PagerDefault')
-        ->extend('TableSort')
-        ->fields('t')
-        ->limit(50)
-        ->orderByHeader($headers)
-        ->execute();
+    $results = entity_get_controller("itonics_nabin_teacher")->listAll($headers);
 
     foreach ($results as $row) {
         $image = '';
@@ -247,7 +236,7 @@ function itonics_nabin_teacher_list() {
             'last_name' => check_plain($row->last_name),
             'gender' => $row->gender ? $genders[$row->gender] : null,
             'job_type' => count($selected_job_types) ? (implode(', ', $selected_job_types)) : null,
-            'join_date' => format_date(strtotime($row->join_date), 'custom', 'Y-m-d'),
+            'join_date' => format_date($row->join_date, 'custom', 'Y-m-d'),
             'actions' => [
                 'data' => [
                     '#theme' => 'links',
@@ -298,20 +287,20 @@ function itonics_nabin_teacher_list() {
     return $build;
 }
 
-function _itonics_nabin_ajax_get_states($district = null) {
-    $records = db_select('itonics_nabin_states', 't')
-        ->fields('t', ['state_id', 'state_name'])
-        ->execute()
-        ->fetchAll();
+
+/**
+ * @param $district
+ * @return array
+ * @throws EntityMalformedException
+ */
+function _itonics_nabin_ajax_get_states($district = null): array
+{
+    $records = entity_get_controller('itonics_nabin_state')->getAllWithoutPagination(["state_id", "state_name"]);
 
     $states = [];
     $selected_state_id = null;
     if ($district) {
-        $selected_district = db_select('itonics_nabin_district', 'd')
-            ->fields('d')
-            ->condition('d.district_id', $district)
-            ->execute()
-            ->fetchObject();
+        $selected_district = entity_load("itonics_nabin_district", $district);
 
         if ($selected_district) {
             $selected_state_id  = $selected_district->state_id;
@@ -328,16 +317,18 @@ function _itonics_nabin_ajax_get_states($district = null) {
     ];
 }
 
-function _itonics_nabin_ajax_get_districts($state = '') {
+/**
+ * @param $state
+ * @return array
+ * @throws EntityMalformedException
+ */
+function _itonics_nabin_ajax_get_districts($state = ''): array
+{
     if (empty($state)) {
         return [];
     }
 
-    $results = db_select('itonics_nabin_district', 'r')
-        ->fields('r', ['district_id', 'district_name'])
-        ->condition('state_id', $state)
-        ->execute()
-        ->fetchAll();
+    $results = entity_get_controller("itonics_nabin_district")->getByStateId($state);
     $regions = [];
     foreach ($results as $result) {
         $regions[$result->district_id] = $result->district_name;
@@ -345,17 +336,14 @@ function _itonics_nabin_ajax_get_districts($state = '') {
     return $regions;
 }
 
-function get_teacher($teacher_id) {
-    return db_select('itonics_nabin_teacher_information', 't')
-        ->fields('t')
-        ->condition('teacher_id', $teacher_id)
-        ->execute()
-        ->fetchObject();
-}
-
-function itonics_nabin_teacher_view($teacher_id) {
+/**
+ * @param $teacher
+ * @return array
+ * @throws Exception
+ */
+function itonics_nabin_teacher_view($teacher): array
+{
     global $genders, $job_types;
-    $teacher = get_teacher($teacher_id);
 
     if (!$teacher) {
         return drupal_not_found();
@@ -415,7 +403,7 @@ function itonics_nabin_teacher_view($teacher_id) {
                         'data' => 'Join Date',
                         'header' => TRUE,
                     ],
-                    format_date(strtotime($teacher->join_date), 'long'),
+                    format_date($teacher->join_date, 'long'),
                 ],
             ],
         ],
@@ -432,10 +420,10 @@ function itonics_nabin_teacher_view($teacher_id) {
 
     $markup = '<div class="actions">';
     if (user_access('edit teacher')) {
-        $markup .= l(t('Edit'), 'admin/itonics-nabin-teacher/edit/' . $teacher_id);
+        $markup .= l(t('Edit'), 'admin/itonics-nabin-teacher/edit/' . $teacher->teacher_id);
     }
     if (user_access('delete teacher')) {
-        $markup .= ' | ' . l(t('Delete'), 'admin/itonics-nabin-teacher/delete/' . $teacher_id) . ' | ';
+        $markup .= ' | ' . l(t('Delete'), 'admin/itonics-nabin-teacher/delete/' . $teacher->teacher_id) . ' | ';
     }
 
     $markup .= l(t('Back to list'), 'admin/itonics-nabin-teacher'). '</div>';
@@ -446,15 +434,19 @@ function itonics_nabin_teacher_view($teacher_id) {
     return $teacher_view;
 }
 
-function itonics_nabin_teacher_form($form, &$form_state, $teacher_id = null) {
+/**
+ * @param $form
+ * @param $form_state
+ * @param $teacher
+ * @return array[]
+ * @throws EntityMalformedException
+ */
+function itonics_nabin_teacher_form($form, &$form_state, $teacher = NULL): array
+{
     global $genders, $job_types;
     $form = [];
 
-    $teacher = null;
-
-    if ($teacher_id) {
-        $teacher = get_teacher($teacher_id);
-
+    if ($teacher) {
         if (!empty($teacher->profile_picture)) {
             $form_state['storage']['old_image'] = $teacher->profile_picture;
         }
@@ -462,9 +454,9 @@ function itonics_nabin_teacher_form($form, &$form_state, $teacher_id = null) {
 
     $get_state_options = _itonics_nabin_ajax_get_states(isset($teacher) ? $teacher->region_id ?? NULL : null);
     $state_options = $get_state_options['states'] ?? [];
-    $selected_state = isset($form_state['values']['state']) ? $form_state['values']['state'] : key($state_options);
+    $selected_state = $form_state['values']['state'] ?? key($state_options);
 
-
+    $form_state["entity"] = $teacher;
     $form = [
         'first_name' => [
             '#type' => 'textfield',
@@ -486,7 +478,7 @@ function itonics_nabin_teacher_form($form, &$form_state, $teacher_id = null) {
             '#options' => $genders,
             '#prefix' => '<div id="gender-wrapper">',
             '#suffix' => '</div>',
-            '#default_value' => !empty($teacher) ? ($teacher->gender ? $genders[$teacher->gender] : '') : '',
+            '#default_value' => !empty($teacher) ? $teacher->gender : '',
         ],
         'job_type' => [
             '#type' => 'checkboxes',
@@ -530,7 +522,7 @@ function itonics_nabin_teacher_form($form, &$form_state, $teacher_id = null) {
             '#type' => 'date_popup',
             '#title' => 'Join Date',
             '#date_format' => 'Y-m-d',
-            '#default_value' => !empty($teacher) ? format_date(strtotime($teacher->join_date), 'custom', 'Y-m-d') : NULL,
+            '#default_value' => !empty($teacher) ? format_date($teacher->join_date, 'custom', 'Y-m-d') : NULL,
             '#prefix' => '<div id="join-date-wrapper">',
             '#suffix' => '</div>',
         ],
@@ -553,16 +545,32 @@ function itonics_nabin_teacher_form($form, &$form_state, $teacher_id = null) {
             '#type' => 'value',
             '#value' => !empty($teacher) ? $teacher->teacher_id : NULL,
         ],
+        'entity' => [
+            '#type' => 'value',
+            '#value' => $teacher
+        ]
     ];
 
     return $form;
 }
 
-function itonics_nabin_ajax_get_districts_callback($form, $form_state) {
+/**
+ * @param $form
+ * @param $form_state
+ * @return mixed
+ */
+function itonics_nabin_ajax_get_districts_callback($form, $form_state): mixed
+{
     return $form['region_id'];
 }
 
-function itonics_nabin_teacher_ajax_form_submit_callback($form, &$form_state) {
+/**
+ * @param $form
+ * @param $form_state
+ * @return array
+ */
+function itonics_nabin_teacher_ajax_form_submit_callback($form, &$form_state): array
+{
     $commands = [];
     $values = $form_state['values'];
 
@@ -622,7 +630,7 @@ function itonics_nabin_teacher_ajax_form_submit_callback($form, &$form_state) {
                 url('admin/itonics-nabin-teachers', [
                     'absolute' => TRUE,
                 ]),
-            ]),
+            ])
         ],
         '#attached' => [
             'js' => [
@@ -632,9 +640,15 @@ function itonics_nabin_teacher_ajax_form_submit_callback($form, &$form_state) {
     ];
 }
 
-function store_or_update_teacher($form, &$form_state) {
+/**
+ * @param $form
+ * @param $form_state
+ * @return mixed
+ */
+function store_or_update_teacher($form, &$form_state): mixed
+{
     $values = $form_state['values'];
-
+    $entity = $values['entity'] ?? NULL;
     $file = file_load($values['profile_picture']);
 
     $file->status = FILE_STATUS_PERMANENT;
@@ -650,17 +664,23 @@ function store_or_update_teacher($form, &$form_state) {
         'profile_picture' => $profile_picture_id,
         'description' => $values['description']['value'],
         'job_type' => isset($values['job_type']) ? serialize($values['job_type']) : NULL,
-        'join_date' => date($values['join_date']),
+        'join_date' => strtotime($values['join_date']),
         'updated' => REQUEST_TIME,
     ];
 
+    // trigger hook to modify data
+    drupal_alter('itonics_nabin_faculty_teacher_data', $fields, $form_state);
+
+    foreach ($fields as $key => $field) {
+        $entity->{$key} = $field;
+    }
+
     if (empty($values['teacher_id'])) {
-        $fields['created'] = REQUEST_TIME;
-        drupal_write_record('itonics_nabin_teacher_information', $fields);
+        $entity->created = REQUEST_TIME;
+        entity_save("itonics_nabin_teacher", $entity);
         drupal_set_message('Teacher created successfully.');
     } else {
-        $fields['teacher_id'] = $values['teacher_id'];
-        drupal_write_record('itonics_nabin_teacher_information', $fields, 'teacher_id');
+        entity_save("itonics_nabin_teacher", $entity);
         if (!empty($form_state['storage']['old_image'])) {
             $old_file = file_load($form_state['storage']['old_image']);
             file_usage_delete($old_file, 'itonics_nabin_teacher', 'teacher_information', $values['teacher_id']);
@@ -673,10 +693,17 @@ function store_or_update_teacher($form, &$form_state) {
     return $form;
 }
 
-function itonics_nabin_teacher_delete_form($form, &$form_state, $teacher_id) {
-    $form['teacher_id'] = [
+/**
+ * @param $form
+ * @param $form_state
+ * @param $teacher
+ * @return array
+ */
+function itonics_nabin_teacher_delete_form($form, &$form_state, $teacher): array
+{
+    $form['teacher'] = [
         '#type' => 'value',
-        '#value' => $teacher_id,
+        '#value' => $teacher,
     ];
 
     return confirm_form(
@@ -689,22 +716,24 @@ function itonics_nabin_teacher_delete_form($form, &$form_state, $teacher_id) {
     );
 }
 
-function itonics_nabin_teacher_delete_form_submit($form, &$form_state) {
-    $teacher_id = $form_state['values']['teacher_id'];
-
-    $teacher = get_teacher($teacher_id);
+/**
+ * @param $form
+ * @param $form_state
+ * @return void
+ */
+function itonics_nabin_teacher_delete_form_submit($form, &$form_state): void
+{
+    $teacher = $form_state['values']['teacher'];
 
     if (!empty($teacher->profile_picture)) {
         $file = file_load($teacher->profile_picture);
         if ($file) {
-            file_usage_delete($file, 'itonics_nabin_teacher', 'teacher_information', $teacher_id);
+            file_usage_delete($file, 'itonics_nabin_teacher', 'teacher_information', $teacher->teacher_id);
             file_delete($file);
         }
     }
 
-    db_delete('itonics_nabin_teacher_information')
-        ->condition('teacher_id', $teacher_id)
-        ->execute();
+    entity_delete("itonics_nabin_teacher", $teacher->teacher_id);
 
     drupal_set_message('Teacher deleted');
     $form_state['redirect'] = 'admin/itonics-nabin-teachers';
@@ -720,11 +749,9 @@ function itonics_nabin_teacher_delete_form_submit($form, &$form_state) {
  * @return void
  */
 function itonics_nabin_teacher_form_error_ajax_commands(array &$commands, $wrapper_id, $error_message = NULL, $field_selector = '', $add_class = TRUE) {
+    $commands[] = ajax_command_invoke($wrapper_id . ' .custom-error', 'remove');
     if ($error_message !== NULL) {
-        $commands[] = ajax_command_invoke($wrapper_id . ' .custom-error', 'remove');
         $commands[] = ajax_command_invoke($wrapper_id, 'prepend', [$error_message]);
-    } else {
-        $commands[] = ajax_command_invoke($wrapper_id . ' .custom-error', 'remove');
     }
 
     if ($field_selector) {
